@@ -71,6 +71,7 @@ public class MainActivity extends Activity {
         if (b != null) web.restoreState(b);
         else web.loadUrl(WEB + "?v=" + System.currentTimeMillis());   // siempre la página recién publicada, nunca la guardada
         setContentView(web);
+        resultadoInstalacion(getIntent());
         // ¿Hay una versión nueva de la app? (la página se actualiza sola; esto es para el ícono, el botón Atrás, etc.)
         if (b == null) new Thread(() -> {
             if (Actualizacion.publicada() > Actualizacion.miVersion(this)) {
@@ -106,6 +107,24 @@ public class MainActivity extends Activity {
         String s = "";
         for (String p : u.getPathSegments()) if (!"p".equals(p)) s = p;
         return s.replaceAll("-\\d+$", "").replace('-', ' ').trim();
+    }
+
+    /** El instalador de Android avisa cómo fue la actualización hecha a mano (ver Actualizacion.instalar). */
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        resultadoInstalacion(i);
+    }
+    private void resultadoInstalacion(Intent i) {
+        if (i == null || !i.hasExtra(android.content.pm.PackageInstaller.EXTRA_STATUS)) return;
+        int st = i.getIntExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, android.content.pm.PackageInstaller.STATUS_FAILURE);
+        if (st == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            Intent confirmar = i.getParcelableExtra(Intent.EXTRA_INTENT);
+            estado("Tocá «Actualizar» en el cartel de Android");
+            if (confirmar != null) try { startActivity(confirmar); } catch (Exception ignored) { }
+        } else if (st != android.content.pm.PackageInstaller.STATUS_SUCCESS) {
+            estado("No se instaló la actualización. Probá de nuevo");
+        }
     }
 
     /** "Actualizar" en el cartel de la página: pide el permiso si falta (y sigue al volver) o baja e instala. */

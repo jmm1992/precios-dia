@@ -13,7 +13,7 @@
         android:label="Precios Día"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
-        <activity android:name=".MainActivity" android:exported="true"
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -22,9 +22,5 @@
             </intent-filter>
         </activity>
 
-        <!-- Después de actualizarse con "Actualizar", la app se vuelve a abrir sola -->
-        <receiver android:name=".Reabrir" android:exported="false">
-            <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
-        </receiver>
     </application>
 </manifest>

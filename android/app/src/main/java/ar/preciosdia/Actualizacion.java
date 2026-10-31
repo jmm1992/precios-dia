@@ -87,6 +87,16 @@ final class Actualizacion {
                     s.fsync(out);
                 }
                 String accion = a.getPackageName() + ".INSTALADO";
+                if (!sola) {
+                    // A mano ("Actualizar"): el resultado va directo a la pantalla de la app. Así, cuando la versión
+                    // nueva queda instalada, el instalador de Android la vuelve a abrir (Android no deja que una app
+                    // se abra sola desde atrás). Si Android pide confirmar, lo maneja MainActivity.resultadoInstalacion.
+                    Intent abrir = new Intent(a, MainActivity.class).setAction(accion)
+                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    PendingIntent pa = PendingIntent.getActivity(a, id, abrir, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+                    s.commit(pa.getIntentSender());
+                    return;
+                }
                 BroadcastReceiver rec = new BroadcastReceiver() {
                     @Override public void onReceive(Context ctx, Intent i) {
                         int st = i.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
