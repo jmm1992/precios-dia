@@ -194,6 +194,12 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .cuenta .botones{margin-top:16px}
 .quien{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut);margin:-4px 0 10px}
 .quien button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 12px;font-weight:600}
+/* Cartel propio de "hay una versión nueva" de la app */
+.actLogo{display:flex;justify-content:center;margin:6px 0 4px}
+.actLogo i{width:52px;height:52px;border-radius:15px;background:linear-gradient(135deg,#ff5a5f,#e30613);color:#fff;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:26px;box-shadow:0 3px 10px rgba(227,6,19,.35)}
+#hojaAct h2{text-align:center;margin:8px 0 4px}
+#hojaAct .explica{text-align:center}
+#actEstado{text-align:center;min-height:1em}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 @media (max-width:520px){
@@ -219,6 +225,7 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 </header>
 <main id="vista"></main>
 <div class="velo" id="velo"><div class="hoja" id="hoja"></div></div>
+<div class="velo" id="veloAct"><div class="hoja" id="hojaAct"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -247,7 +254,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
 // Versión de la página (cambiarla al publicar) y de la app de Android (la app la agrega al "user agent")
-const VERSION_PAGINA = '31/10 20:40';
+const VERSION_PAGINA = '31/10 20:55';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
@@ -726,6 +733,7 @@ V.addEventListener('submit', e => {
 
 // Botón Atrás del celular (lo llama la app Android): primero cierra lo abierto. Devuelve true si lo resolvió acá.
 window.atrasApp = function(){
+  if (document.getElementById('veloAct').classList.contains('on')){ document.getElementById('veloAct').classList.remove('on'); return true; }
   if (document.getElementById('velo').classList.contains('on')){ cerrarDetalle(); return true; }
   if (st.tab === 'rubros' && st.rub.length){ st.rub = st.rub.slice(0, -1); st.rubQ = ''; guardar(); dibujar(); return true; }
   if (st.tab !== 'ofertas'){ ir('ofertas'); return true; }
@@ -740,6 +748,23 @@ window.atrasApp = function(){
   if (t === 'buscar' && arg) st.q = arg;
   const o = new URLSearchParams(location.search).get('orden'); if (o && EXPLICA[o]) st.orden = o;
 })();
+// Cartel propio de "hay una versión nueva" de la app: lo pide la app de Android (AppPD) cuando hay una más nueva publicada
+window.avisoActualizacion = function(){
+  if (avisoActualizacion.visto) return; avisoActualizacion.visto = true;
+  document.getElementById('hojaAct').innerHTML = `<div class="actLogo"><i>$</i></div>
+    <h2>Hay una versión nueva</h2>
+    <p class="explica">Precios Día tiene una actualización de la app. Se instala en unos segundos y no se pierde nada: ni tu cuenta ni tu lista.</p>
+    <p class="nota" id="actEstado"></p>
+    <div class="botones"><button data-act="despues">Después</button><button class="pri" data-act="si">Actualizar</button></div>`;
+  document.getElementById('veloAct').classList.add('on');
+};
+window.estadoActualizacion = t => { const e = document.getElementById('actEstado'); if (e) e.textContent = t; };
+document.getElementById('veloAct').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (e.target.id === 'veloAct' || (b && b.dataset.act === 'despues')) return document.getElementById('veloAct').classList.remove('on');
+  if (b && b.dataset.act === 'si' && window.AppPD){ b.textContent = 'Actualizando…'; AppPD.actualizar(); }
+});
+if (window.AppPD && AppPD.hayNueva()) avisoActualizacion();
 dibujar();
 </script>
 </body>

@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -23,6 +24,14 @@ public class MainActivity extends Activity {
     static final String COPIA = "file:///android_asset/index.html";
     static final String APP_DIA = "ar.com.supermercadosdia.customers";   // la app Día Online (sale de assetlinks.json de su web)
     private WebView web;
+    private volatile boolean hayNueva = false;        // hay una app más nueva publicada (lo avisa la página, con su propio cartel)
+    private volatile boolean esperandoPermiso = false; // se fue a dar el permiso de "Instalar apps": al volver, se instala
+
+    /** Lo que la página puede pedirle a la app (sólo se cargan la página propia y su copia: lo de afuera va al navegador). */
+    class Puente {
+        @JavascriptInterface public boolean hayNueva() { return hayNueva; }
+        @JavascriptInterface public void actualizar() { runOnUiThread(() -> empezarActualizacion()); }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -37,6 +46,7 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         // La página reconoce que es la app y muestra su versión
         s.setUserAgentString(s.getUserAgentString() + " PreciosDiaApp/" + versionApp());
+        web.addJavascriptInterface(new Puente(), "AppPD");
         // Los enlaces de afuera (la web de Día) se abren en el navegador; la página propia, acá
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -64,7 +74,37 @@ public class MainActivity extends Activity {
         else web.loadUrl(WEB + "?v=" + System.currentTimeMillis());   // siempre la página recién publicada, nunca la guardada
         setContentView(web);
         // ¿Hay una versión nueva de la app? (la página se actualiza sola; esto es para el ícono, el botón Atrás, etc.)
-        if (b == null) new Thread(() -> Actualizacion.ofrecerSiHay(this), "ver-actualizacion").start();
+        if (b == null) new Thread(() -> {
+            if (Actualizacion.publicada() > Actualizacion.miVersion(this)) {
+                hayNueva = true;
+                runOnUiThread(() -> web.evaluateJavascript("window.avisoActualizacion && avisoActualizacion()", null));
+            }
+        }, "ver-actualizacion").start();
+    }
+
+    /** "Actualizar" en el cartel de la página: pide el permiso si falta (y sigue al volver) o baja e instala. */
+    private void empezarActualizacion() {
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            esperandoPermiso = true;
+            estado("Activá «Permitir desde esta fuente» y volvé: la actualización sigue sola");
+            try { startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))); }
+            catch (Exception ignored) { }
+            return;
+        }
+        estado("Descargando la versión nueva…");
+        new Thread(() -> Actualizacion.instalar(this, false), "actualizar").start();
+    }
+
+    /** Muestra en el cartel de la página cómo va la actualización. */
+    void estado(String texto) {
+        String js = "window.estadoActualizacion && estadoActualizacion(" + org.json.JSONObject.quote(texto) + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (esperandoPermiso && getPackageManager().canRequestPackageInstalls()) { esperandoPermiso = false; empezarActualizacion(); }
     }
 
     @Override
