@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e30613">
+<title>Precios Día</title>
+<style>
+:root{
+  --bg:#f4f5f8;--card:#fff;--ink:#171b26;--mut:#6b7385;--line:#e6e8ee;--soft:#f1f3f7;
+  --dia:#e30613;--dia2:#ffe9eb;--azul:#2563eb;
+  --verde:#138a3e;--verde2:#e3f6ea;--rojo:#d32f2f;--rojo2:#fdecec;--oro:#b7791f;--oro2:#fff4dc;--vio:#7c3aed;--vio2:#f1eafe;
+  --sombra:0 1px 2px rgba(20,25,40,.06),0 4px 14px rgba(20,25,40,.06);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1218;--card:#191e27;--ink:#eceff5;--mut:#9aa3b5;--line:#2a313d;--soft:#212733;
+  --dia:#ff4d57;--dia2:#3b1b20;--azul:#7aa8ff;
+  --verde:#4ade80;--verde2:#16321f;--rojo:#ff6b6b;--rojo2:#3a1c1f;--oro:#fbbf24;--oro2:#3a2e14;--vio:#c4a5ff;--vio2:#2c2140;
+  --sombra:none;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:clip}
+button{font:inherit;color:inherit;cursor:pointer}
+img{display:block}
+
+/* Barra de arriba */
+header{background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(10px);color:var(--ink);position:sticky;top:0;z-index:20;border-bottom:1px solid var(--line)}
+.top{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:10px;padding:10px 14px 4px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;letter-spacing:-.3px;white-space:nowrap}
+.logo i{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#ff5a5f,#e30613);color:#fff;display:grid;place-items:center;font-style:normal;font-size:15px;box-shadow:0 2px 6px rgba(227,6,19,.3)}
+.tiendaBtn{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13.5px;max-width:62vw}
+.tiendaBtn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tiendaBtn:hover{border-color:var(--mut)}
+nav{max-width:1100px;margin:0 auto;display:flex;gap:4px;padding:0 10px;overflow-x:auto;scrollbar-width:none}
+nav button{background:none;border:0;color:var(--mut);padding:10px 12px 11px;font-size:14.5px;white-space:nowrap;border-bottom:3px solid transparent}
+nav button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--dia)}
+
+main{max-width:1100px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
+.bajada{color:var(--mut);font-size:13.5px;margin:0 0 12px}
+.fila{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hora{font-size:12.5px;color:var(--mut);margin-left:auto}
+.actualizando{color:var(--oro)}
+.hora button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 10px;font-size:12.5px;margin-left:6px}
+
+/* Chips y segmento */
+/* Fila de botones que se desliza: con el dedo, la rueda del mouse, arrastrando o con las flechas */
+.chipsWrap{position:relative;margin:0 0 10px}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 2px;scroll-behavior:smooth;cursor:grab;user-select:none}
+.chips::-webkit-scrollbar{display:none}
+.chips.arrastrando{cursor:grabbing;scroll-behavior:auto}
+.chips button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 13px;font-size:13.5px;white-space:nowrap}
+.flecha{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);box-shadow:var(--sombra);font-size:18px;line-height:1;z-index:2;display:none}
+.flecha.izq{left:-4px}.flecha.der{right:-4px}
+.chipsWrap.puedeIzq .flecha.izq,.chipsWrap.puedeDer .flecha.der{display:block}
+.chipsWrap.puedeIzq::before,.chipsWrap.puedeDer::after{content:"";position:absolute;top:0;bottom:0;width:40px;pointer-events:none;z-index:1}
+.chipsWrap.puedeIzq::before{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
+.chipsWrap.puedeDer::after{right:0;background:linear-gradient(270deg,var(--bg),transparent)}
+.chips button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--mut);cursor:pointer;user-select:none}
+.switch input{width:18px;height:18px;accent-color:var(--dia)}
+
+/* Grilla de productos */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.pc{background:var(--card);border-radius:16px;box-shadow:var(--sombra);border:1px solid var(--line);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;position:relative;transition:transform .12s}
+.pc:hover{transform:translateY(-2px)}
+.pc.sin{opacity:.55}
+/* La foto ocupa SIEMPRE el mismo cuadrado, sea la imagen alta, ancha o enorme */
+.foto{background:#fff;aspect-ratio:1/1;position:relative;overflow:hidden;flex:none}
+.foto img{position:absolute;left:9%;top:9%;width:82%;height:82%;object-fit:contain}
+.badges{position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.b{font-weight:800;font-size:12.5px;padding:3px 8px;border-radius:8px;color:#fff;background:var(--dia)}
+.b.x2{background:#138a3e}
+.b.oro{background:#b7791f}
+.star{position:absolute;right:6px;top:6px;border:0;background:rgba(255,255,255,.9);border-radius:999px;width:34px;height:34px;font-size:18px;color:#9aa3b5;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.star.on{color:#f5b301}
+.info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:3px;flex:1}
+.nom{font-size:13.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.precio{font-size:21px;font-weight:800;letter-spacing:-.3px;font-variant-numeric:tabular-nums;margin-top:2px}
+.precio s{font-size:13px;color:var(--mut);font-weight:500;margin-left:6px}
+.unit{font-size:12.5px;color:var(--mut)}
+.promo2{font-size:12.5px;font-weight:700;color:var(--verde)}
+.flag{font-size:12px;font-weight:700;border-radius:8px;padding:3px 7px;align-self:flex-start;margin-top:3px}
+.flag.oro{background:var(--oro2);color:var(--oro)}
+.flag.vio{background:var(--vio2);color:var(--vio)}
+.flag.verde{background:var(--verde2);color:var(--verde)}
+.flag.rojo{background:var(--rojo2);color:var(--rojo)}
+
+/* Tira de "llevando 2" */
+.tira{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(160px,180px);gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:16px;scrollbar-width:thin}
+.seccion{font-size:15.5px;font-weight:800;margin:6px 0 8px;display:flex;align-items:center;gap:8px}
+.seccion small{font-weight:500;color:var(--mut);font-size:12.5px}
+
+/* Rubros */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 12px;text-align:left;box-shadow:var(--sombra)}
+.tile .e{font-size:28px}
+.tile b{display:block;margin-top:6px;font-size:14.5px}
+.tile small{color:var(--mut);font-size:12px}
+/* Secciones de un rubro: lista compacta, un renglón por sección con sus sub-secciones al lado */
+.secciones{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:6px 0 14px;overflow:hidden}
+.secciones summary{list-style:none;cursor:pointer;padding:10px 14px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+.secciones summary::-webkit-details-marker{display:none}
+.secciones summary::after{content:"▾";margin-left:auto;color:var(--mut);transition:transform .15s}
+.secciones:not([open]) summary::after{transform:rotate(-90deg)}
+.secciones summary small{font-weight:500;color:var(--mut)}
+.secFila{display:grid;grid-template-columns:190px 1fr;gap:4px 12px;padding:7px 14px;border-top:1px solid var(--line);align-items:baseline}
+.secFila .nomSec{border:0;background:none;padding:0;font-weight:700;font-size:13.5px;text-align:left;color:var(--ink)}
+.secFila .subs{display:flex;flex-wrap:wrap;gap:2px 14px}
+.secFila .subs button{border:0;background:none;padding:2px 0;font-size:13.5px;color:var(--mut)}
+.secFila button:hover{color:var(--dia);text-decoration:underline}
+@media (max-width:520px){ .secFila{grid-template-columns:1fr} }
+.ctrlbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.ctrlbar .buscar{flex:1 1 260px;margin:0}
+.ordenSel{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--mut)}
+.ordenSel select{font:inherit;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.miga{font-size:13.5px;color:var(--mut);margin-bottom:6px}
+.miga button{border:0;background:none;color:var(--azul);padding:0;font-size:13.5px}
+
+/* Mi lista: resumen, renglones con traza y detalle con historia */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--mut)}
+.lsegs{display:flex;flex-direction:column;gap:8px}
+.lseg{display:grid;grid-template-columns:56px minmax(0,1fr) 140px auto 36px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;position:relative}
+.lseg:hover{border-color:var(--mut)}
+.lseg img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:10px}
+.lnom b{font-size:14px;line-height:1.3;display:block}
+.ltags{display:flex;gap:4px;flex-wrap:wrap}
+.ltags .flag{margin-top:4px}
+.ldesde{font-size:12.5px;color:var(--mut);margin-top:3px}
+.lprecio{text-align:right;white-space:nowrap}
+.lprecio b{font-size:19px;font-weight:800;display:block}
+.lprecio small{font-size:12px;color:var(--mut)}
+.lseg .star{position:static;width:32px;height:32px;box-shadow:none;background:var(--soft)}
+.trazaVacia{font-size:12px;color:var(--mut);text-align:center}
+.subt{font-size:15px;margin:16px 0 6px}
+.tabla{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px;font-variant-numeric:tabular-nums}
+.tabla th{font-size:12px;color:var(--mut);text-align:left;font-weight:600;padding:6px 4px;border-bottom:1px solid var(--line)}
+.tabla td{padding:7px 4px;border-bottom:1px solid var(--line)}
+.tabla .n{text-align:right}
+.mini-promo{font-size:11px;font-weight:700;color:var(--verde);background:var(--verde2);border-radius:6px;padding:1px 6px}
+.grafico text{fill:var(--mut);font-size:11px}
+.ley{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:4px}
+.ley i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.baja{color:var(--verde)}.sube{color:var(--rojo)}.igual{color:var(--mut)}
+@media (max-width:620px){
+  .lseg{grid-template-columns:48px minmax(0,1fr) auto;gap:8px 10px}
+  .lseg img{width:48px;height:48px}
+  .ltraza{grid-column:2/3;grid-row:2}
+  .lprecio{grid-column:3;grid-row:1}
+  .lseg .star{grid-column:3;grid-row:2;justify-self:end}
+}
+
+/* Estados */
+.vacio{background:var(--card);border:1px dashed var(--line);border-radius:16px;color:var(--mut);text-align:center;padding:28px 14px}
+.error{background:var(--rojo2);color:var(--rojo);border-radius:12px;padding:11px 14px;font-size:14px;margin-bottom:12px}
+.esqueleto .pc{cursor:default}
+.esqueleto .foto,.esqueleto .lin{background:linear-gradient(90deg,var(--soft),var(--line),var(--soft));background-size:200% 100%;animation:brillo 1.2s infinite}
+.esqueleto .lin{height:12px;border-radius:6px;margin:6px 0}
+@keyframes brillo{to{background-position:-200% 0}}
+.nota{font-size:13px;color:var(--mut);margin:12px 2px}
+.nota button{border:0;background:none;color:var(--azul);text-decoration:underline;padding:0;font-size:13px}
+.buscar{display:flex;gap:8px;margin-bottom:10px}
+.buscar input{flex:1;font:inherit;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.buscar button{border:0;background:var(--dia);color:#fff;border-radius:12px;padding:0 18px;font-weight:700}
+.tienda{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:8px}
+.tienda small{color:var(--mut)}
+.tienda button{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 14px;font-weight:700}
+.tienda.on{border-color:var(--dia)}.tienda.on button{background:var(--dia);color:#fff;border-color:var(--dia)}
+
+/* Hoja de detalle */
+.velo{position:fixed;inset:0;background:rgba(10,12,18,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.velo.on{opacity:1;pointer-events:auto}
+.hoja{background:var(--card);width:min(560px,100%);max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 18px 24px;transform:translateY(30px);transition:transform .2s}
+.velo.on .hoja{transform:none}
+@media (min-width:700px){.velo{align-items:center}.hoja{border-radius:20px}}
+.hoja .cierra{float:right;border:0;background:var(--soft);border-radius:999px;width:34px;height:34px;font-size:16px}
+.hoja .img{background:#fff;border-radius:14px;display:grid;place-items:center;height:200px;margin:8px 0 12px}
+.hoja .img img{max-height:180px;max-width:80%;object-fit:contain}
+.hoja h2{font-size:18px;margin:0 0 10px;line-height:1.3}
+.renglon{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.renglon span:last-child{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.explica{font-size:13px;color:var(--mut);margin:10px 0}
+.botones{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.botones a,.botones button{flex:1 1 160px;text-align:center;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px;font-weight:700;color:var(--ink);text-decoration:none}
+.botones .pri{background:var(--dia);color:#fff;border-color:var(--dia)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+@media (max-width:520px){
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .precio{font-size:19px}
+  .logo{font-size:16px}
+  main{padding:12px 10px 40px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="logo"><i>$</i>Precios Día</div>
+    <button class="tiendaBtn" id="btnTienda" title="Cambiar de tienda">📍 <span id="tiendaTxt"></span> ▾</button>
+  </div>
+  <nav id="tabs">
+    <button data-t="ofertas">🔥 Ofertas</button>
+    <button data-t="rubros">🗂️ Rubros</button>
+    <button data-t="buscar">🔎 Buscar</button>
+    <button data-t="lista">⭐ Mi lista</button>
+  </nav>
+</header>
+<main id="vista"></main>
+<div class="velo" id="velo"><div class="hoja" id="hoja"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const API = 'https://uhtsqhooszsvcpcamltc.supabase.co/functions/v1/dia-precios';
+const TIENDA_DEF = {seller:'ardiaprod1006', nombre:'Tablada', direccion:'Crovara 2472', localidad:'La Tablada', geo:[-58.52242,-34.68777]};
+const ICONOS = {1:'🥫',53:'🍼',71:'🐾',80:'☕',121:'🧀',164:'🥤',200:'🧊',216:'🧴',256:'🏠',282:'🧽',334:'👕',441:'🔌',338:'⛺',10098:'📺',10113:'🎁',10216:'🥩',10237:'🥦'};
+const REBAJA_GRANDE = 60;   // % de descuento desde el que se avisa "rebaja enorme"
+
+/* ---------- Guardado en este equipo ---------- */
+const LS = 'preciosDia:v4';
+const leer = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
+let st = Object.assign({tienda:TIENDA_DEF, tab:'ofertas', ofCat:'', rub:[], rubQ:'', orden:'descuento', soloStock:true, q:'', seguidos:{}, cp:'1766'}, leer(LS, {}));
+const guardar = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch(e){} };
+
+/* ---------- Formatos ---------- */
+const plata = v => v == null ? '—' : '$ ' + Number(v).toLocaleString('es-AR', {minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2});
+const plataR = v => '$ ' + Math.round(v).toLocaleString('es-AR');
+const pct = v => Math.round(Math.abs(v)) + '%';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
+const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
+const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
+
+/* ---------- Conexión (con memoria de 10 minutos) ---------- */
+const memo = new Map();
+async function api(cuerpo, forzar){
+  const k = JSON.stringify(cuerpo);
+  const m = memo.get(k);
+  if (!forzar && m && Date.now() - m.t < 10 * 60e3) return m.d;
+  const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 50000);
+  try {
+    const r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:k, signal:ctrl.signal});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error || 'el servidor contestó ' + r.status);
+    memo.set(k, {t:Date.now(), d:j});
+    return j;
+  } catch(e){ throw new Error(e.name === 'AbortError' ? 'Día tardó demasiado en contestar' : e.message === 'Failed to fetch' ? 'sin conexión a internet' : e.message); }
+  finally { clearTimeout(to); }
+}
+let RUBROS = null;
+async function rubros(){ if (!RUBROS) RUBROS = (await api({do:'rubros'})).rubros; return RUBROS; }
+const tiendaParam = () => ({seller:st.tienda.seller, geo:st.tienda.geo});
+
+/* ---------- Tarjetas ---------- */
+let enPantalla = new Map();   // id -> producto, para abrir el detalle
+// Precio muy bajo: lo marca el servidor SÓLO con pruebas firmes (sin mostrar precios de otros supermercados):
+// la mitad o menos que en Carrefour / ChangoMás con el mismo código de barras, o 10% o menos de su precio de lista.
+// (Comparar "por kilo contra los de su tipo" daba falsos avisos: mezcla productos distintos.)
+const esMuyBajo = p => !!p.muyBajo;
+function marcas(p){
+  const f = [];
+  if (p.primeroGrupo) f.push(`<span class="flag oro">🥇 El más barato por ${p.unidad === 'kg' ? 'kilo' : 'litro'}</span>`);
+  if (esMuyBajo(p)) f.push(`<span class="flag vio">🚨 Precio muy bajo</span>`);
+  if (p.descuento >= REBAJA_GRANDE) f.push(`<span class="flag rojo">⚡ Rebaja enorme</span>`);
+  return f.join('');
+}
+function tarjeta(p){
+  enPantalla.set(p.id, p);
+  const seg = !!st.seguidos[p.id];
+  return `<div class="pc ${p.disponible ? '' : 'sin'}" data-id="${p.id}">
+    <div class="foto"><img src="${esc(p.imagen)}" alt="" loading="lazy">
+      <div class="badges">${p.descuento >= 1 ? `<span class="b">−${pct(p.descuento)}</span>` : ''}${p.llevando2 ? `<span class="b x2">${esc(p.promoNombre || 'Promo')}</span>` : ''}</div>
+      <button class="star ${seg ? 'on' : ''}" data-seguir="${p.id}" title="${seg ? 'Dejar de seguir' : 'Seguir su precio'}">${seg ? '★' : '☆'}</button>
+    </div>
+    <div class="info">
+      <div class="nom">${esc(p.nombre)}</div>
+      <div class="precio">${plata(p.precio)}${p.lista > p.precio ? `<s>${plata(p.lista)}</s>` : ''}</div>
+      ${p.porUnidad ? `<div class="unit">${plataR(p.porUnidad)} ${porQue(p.unidad)}</div>` : ''}
+      ${p.llevando2 ? `<div class="promo2">Llevando ${p.promoCant || 2}: ${plata(p.llevando2)} c/u</div>` : ''}
+      ${p.disponible ? '' : '<div class="flag rojo">Sin stock en tu tienda</div>'}
+      ${marcas(p)}
+    </div></div>`;
+}
+const esqueleto = (n = 8) => `<div class="grid esqueleto">${Array.from({length:n}, () => `<div class="pc"><div class="foto"></div><div class="info"><div class="lin" style="width:90%"></div><div class="lin" style="width:60%"></div><div class="lin" style="width:40%;height:18px"></div></div></div>`).join('')}</div>`;
+
+function grilla(productos){
+  const visibles = st.soloStock ? productos.filter(p => p.disponible) : productos;
+  const ocultos = productos.length - visibles.length;
+  let h = visibles.length ? `<div class="grid">${visibles.map(tarjeta).join('')}</div>` : `<div class="vacio">No hay productos con stock en tu tienda para mostrar acá.</div>`;
+  if (ocultos) h += `<p class="nota">${ocultos} ${ocultos === 1 ? 'producto no tiene' : 'productos no tienen'} stock en tu tienda y no se muestran. <button data-accion="verSin">Mostrarlos igual</button></p>`;
+  else if (!st.soloStock) h += `<p class="nota"><button data-accion="verSin">Ocultar los que no tienen stock</button></p>`;
+  return h;
+}
+function cabeceraHora(j){ return `<span class="hora">Precios de las ${horaCorta(j.hora)}<button data-accion="refrescar">↻ Actualizar</button></span>`; }
+
+/* ---------- Pantallas ---------- */
+const V = document.getElementById('vista');
+let pedido = 0;   // para descartar respuestas viejas si el usuario cambió de pantalla
+// Lo último que se vio de cada pantalla queda guardado en este equipo: al volver se muestra al instante
+// y se actualiza por detrás (la web de Día tarda unos segundos en contestar).
+const LSC = 'preciosDia:cache';
+const cacheLeer = k => (leer(LSC, {})[k] || null);
+function cacheGuardar(k, d){
+  const c = leer(LSC, {}); c[k] = {t:Date.now(), d};
+  const ks = Object.keys(c).sort((a, b) => c[b].t - c[a].t); for (const x of ks.slice(25)) delete c[x];
+  try { localStorage.setItem(LSC, JSON.stringify(c)); } catch(e){ try { localStorage.removeItem(LSC); } catch(_){} }
+}
+async function cargar(render, cuerpo, forzar){
+  const yo = ++pedido, k = JSON.stringify(cuerpo);
+  const viejo = !forzar && cacheLeer(k);
+  const enMemoria = memo.get(k);
+  if (viejo && !(enMemoria && Date.now() - enMemoria.t < 10 * 60e3)){
+    render(viejo.d);
+    const h = V.querySelector('.hora'); if (h) h.insertAdjacentHTML('afterbegin', '<span class="actualizando">Actualizando… </span>');
+  }
+  try {
+    const j = await api(cuerpo, forzar);
+    if (yo !== pedido) return;
+    cacheGuardar(k, j);
+    render(j); prepararChips();
+  } catch(e){
+    if (yo !== pedido) return;
+    if (viejo){ const a = V.querySelector('.actualizando'); if (a) a.textContent = 'No se pudo actualizar (' + e.message + '). '; return; }
+    V.querySelector('[data-resultado]').innerHTML = `<div class="error">No se pudo consultar a Día: ${esc(e.message)}. <button class="nota" data-accion="refrescar" style="border:0;background:none;color:inherit;text-decoration:underline">Reintentar</button></div>`;
+  }
+}
+
+async function vOfertas(forzar){
+  let R = []; try { R = await rubros(); } catch(e){}
+  V.innerHTML = `
+    <h1>Ofertas de hoy en tu tienda</h1>
+    <p class="bajada">Los productos con más descuento sobre su precio de lista, con stock para retirar en ${esc(nombreTienda())}.</p>
+    ${filaChips([{cat:'', nombre:'Todo', id:0}, ...R].map(r => `<button data-ofcat="${r.cat}" class="${st.ofCat === r.cat ? 'on' : ''}">${ICONOS[r.id] || '🛒'} ${esc(r.nombre)}</button>`).join(''))}
+    <div data-resultado>${esqueleto()}</div>`;
+  cargar(j => {
+    const bajos = j.productos.filter(p => esMuyBajo(p) && p.disponible);
+    const con2 = j.productos.filter(p => p.llevando2 && p.disponible);
+    const tira = (t, sub, l) => `<div class="seccion">${t} <small>${sub}</small></div><div class="tira">${l.map(tarjeta).join('')}</div>`;
+    V.querySelector('[data-resultado]').innerHTML = `<div class="fila" style="margin-bottom:8px">${cabeceraHora(j)}</div>`
+      + (bajos.length ? tira('🚨 Precios muy bajos', 'mucho menos de lo que valen normalmente', bajos) : '')
+      + (con2.length ? tira('🔁 Llevando 2 sale menos', 'promos confirmadas en tu tienda', con2) : '')
+      + (bajos.length || con2.length ? '<div class="seccion">🏷️ Mayor descuento</div>' : '')
+      + grilla(j.productos);
+  }, {do:'listar', modo:'ofertas', cat:st.ofCat, orden:'descuento', tienda:tiendaParam()}, forzar);
+}
+
+const ORDENES = [['descuento','🏷️ Mejores ofertas'], ['unidad','⚖️ Más barato por kilo/litro'], ['precio','💲 Más barato'], ['caro','💎 Más caro'], ['nombre','🔤 Nombre (A-Z)']];
+const EXPLICA = {
+  descuento: 'Primero los precios muy bajos y después el mayor descuento sobre el precio de lista.',
+  unidad: 'Por precio por kilo o por litro, para comparar marcas y tamaños. Cada producto se compara con los de su mismo tipo.',
+  precio: 'Del más barato al más caro.',
+  caro: 'Del más caro al más barato.',
+  nombre: 'Por nombre, de la A a la Z.',
+};
+// Buscador (opcional) + "Ordenar por"
+function controles(buscador){
+  return `<div class="ctrlbar">${buscador ? `<form class="buscar" id="${buscador.id}"><input id="${buscador.id}Q" placeholder="${esc(buscador.ph)}" value="${esc(buscador.valor)}" autocomplete="off" enterkeyhint="search"><button>${buscador.boton || 'Buscar'}</button></form>` : ''}
+    <label class="ordenSel">Ordenar por <select id="selOrden">${ORDENES.map(([k, t]) => `<option value="${k}" ${st.orden === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>`;
+}
+
+// Con "por kilo/litro" se agrupa por tipo de producto (yerba con yerba, té con té)
+function renderOrdenado(j){
+  let h = `<div class="fila" style="margin-bottom:8px"><span class="bajada" style="margin:0">${EXPLICA[st.orden]}</span>${cabeceraHora(j)}</div>`;
+  if (st.orden !== 'unidad') return h + grilla(j.productos);
+  const grupos = new Map();
+  for (const p of j.productos){ const k = p.porUnidad ? (p.subsub || p.subrubro || 'Otros') : 'Sin precio por kilo o litro'; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); }
+  for (const [k, ps] of grupos){
+    const conStock = ps.filter(p => p.disponible && p.porUnidad);
+    if (conStock.length >= 2) conStock[0].primeroGrupo = true;
+    if (st.soloStock && !ps.some(p => p.disponible)) continue;
+    h += `<div class="seccion" style="margin-top:14px">${esc(k)} <small>${ps.length} productos</small></div>` + grilla(ps);
+  }
+  return h;
+}
+
+async function vRubros(forzar){
+  let R;
+  try { R = await rubros(); } catch(e){ V.innerHTML = `<div class="error">No se pudieron traer los rubros: ${esc(e.message)}</div>`; return; }
+  if (!st.rub.length){
+    V.innerHTML = `<h1>Rubros</h1><p class="bajada">Elegí un rubro para ver sus mejores ofertas y lo más barato por kilo o litro en tu tienda.</p>
+      <div class="tiles">${R.map(r => `<button class="tile" data-rub="${r.id}"><span class="e">${ICONOS[r.id] || '🛒'}</span><b>${esc(r.nombre)}</b><small>${r.hijos.length} ${r.hijos.length === 1 ? 'sección' : 'secciones'}</small></button>`).join('')}</div>`;
+    return;
+  }
+  const n1 = R.find(r => r.id === st.rub[0]); if (!n1){ st.rub = []; guardar(); return vRubros(); }
+  const n2 = st.rub[1] ? n1.hijos.find(h => h.id === st.rub[1]) : null;
+  const n3 = n2 && st.rub[2] ? n2.hijos.find(h => h.id === st.rub[2]) : null;
+  const actual = n3 || n2 || n1;
+  // En el rubro se ven TODAS sus secciones con sus sub-secciones; adentro de una sección, sus sub-secciones
+  const secciones = !n2
+    ? `<details class="secciones" open><summary>Secciones <small>${n1.hijos.length}</small></summary>${n1.hijos.map(h => `<div class="secFila"><button class="nomSec" data-rubpath="${h.id}">${esc(h.nombre)} ›</button><div class="subs">${h.hijos.map(n => `<button data-rubpath="${h.id},${n.id}">${esc(n.nombre)}</button>`).join('')}</div></div>`).join('')}</details>`
+    : n2.hijos.length ? filaChips(`<button data-rubpath="${n2.id}" class="${!n3 ? 'on' : ''}">Todo ${esc(n2.nombre)}</button>${n2.hijos.map(h => `<button data-rubpath="${n2.id},${h.id}" class="${n3 && n3.id === h.id ? 'on' : ''}">${esc(h.nombre)}</button>`).join('')}`) : '';
+  V.innerHTML = `
+    <div class="miga"><button data-rubvolver="0">Rubros</button> › ${n2 ? `<button data-rubvolver="1">${esc(n1.nombre)}</button>` : esc(n1.nombre)}${n2 ? ' › ' + (n3 ? `<button data-rubvolver="2">${esc(n2.nombre)}</button>` : esc(n2.nombre)) : ''}${n3 ? ' › ' + esc(n3.nombre) : ''}</div>
+    <h1>${ICONOS[n1.id] || ''} ${esc(actual.nombre)}</h1>
+    ${secciones}
+    ${controles({id:'fRubro', ph:`Buscar en ${actual.nombre}…`, valor:st.rubQ})}
+    ${st.rubQ ? `<p class="nota">Mostrando “${esc(st.rubQ)}” dentro de ${esc(actual.nombre)}. <button data-accion="limpiarRubQ">Ver todo</button></p>` : ''}
+    <div data-resultado>${esqueleto()}</div>`;
+  cargar(j => { V.querySelector('[data-resultado]').innerHTML = j.productos.length ? renderOrdenado(j) : `<div class="vacio">No hay productos${st.rubQ ? ` con “${esc(st.rubQ)}”` : ''} en ${esc(actual.nombre)}.</div>`; },
+    {do:'listar', modo:'rubro', cat:actual.cat, q:st.rubQ, orden:st.orden, tienda:tiendaParam()}, forzar);
+}
+
+async function vBuscar(forzar){
+  V.innerHTML = `<h1>Buscar en tu tienda</h1>
+    ${controles({id:'fBuscar', ph:'Ej.: yerba, leche, Ala, pañales…', valor:st.q})}
+    <div data-resultado>${st.q ? esqueleto() : '<div class="vacio">Escribí lo que buscás. Vas a ver el precio, si hay stock en tu tienda y el precio por kilo o litro.</div>'}</div>`;
+  if (st.q) cargar(j => { V.querySelector('[data-resultado]').innerHTML = j.productos.length ? renderOrdenado(j) : '<div class="vacio">No se encontró nada con ese nombre.</div>'; },
+    {do:'listar', modo:'buscar', q:st.q, orden:st.orden, tienda:tiendaParam()}, forzar);
+}
+
+/* ---------- Historia de precios (Mi lista) ----------
+   La lista vive en Supabase (se ve igual en la PC y en el celular) y una tarea automática guarda el precio de
+   cada producto todos los días a las 9, aunque nadie abra la app. Acá sólo se muestra lo que está guardado:
+   sin dos semanas guardadas no hay comparación semana a semana. */
+let HIST = {};   // id -> [{fecha, precio, lista, promo, promoNombre, disponible}] de la más vieja a la más nueva
+const dF = f => new Date(f + 'T12:00:00');
+const fCortaD = f => dF(f).toLocaleDateString('es-AR', {day:'numeric', month:'numeric'});
+const fLargaD = f => dF(f).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
+const lunesDe = f => { const d = dF(f); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.toISOString().slice(0, 10); };
+const efectivo = r => r.promo ?? r.precio;   // lo que se paga por unidad aprovechando la promo
+function porSemana(h){   // el último precio guardado de cada semana (lunes a domingo)
+  const m = new Map(); for (const r of h) m.set(lunesDe(r.fecha), r);
+  return [...m.entries()].map(([lunes, r]) => ({lunes, ...r}));
+}
+const variacion = (a, b) => b ? (a / b - 1) * 100 : 0;
+const flechaTxt = v => Math.abs(v) < .05 ? '<span class="igual">= igual</span>' : `<span class="${v < 0 ? 'baja' : 'sube'}">${v < 0 ? '▼' : '▲'} ${pct(v)}</span>`;
+
+function traza(h, w = 130, alto = 38){
+  if (h.length < 2) return `<div class="trazaVacia">${h.length ? 'desde ' + fCortaD(h[0].fecha) : ''}</div>`;
+  const v = h.map(r => r.precio), mn = Math.min(...v), mx = Math.max(...v), r = mx - mn || 1;
+  const X = i => 3 + i / (v.length - 1) * (w - 6), Y = x => alto - 4 - (x - mn) / r * (alto - 8);
+  const color = v[v.length - 1] < v[0] ? 'var(--verde)' : v[v.length - 1] > v[0] ? 'var(--rojo)' : 'var(--mut)';
+  return `<svg class="traza" viewBox="0 0 ${w} ${alto}" width="${w}" height="${alto}" aria-hidden="true"><polyline points="${v.map((x, i) => X(i) + ',' + Y(x)).join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/><circle cx="${X(v.length - 1)}" cy="${Y(v[v.length - 1])}" r="3" fill="${color}"/></svg>`;
+}
+function graficoHist(h){
+  if (h.length < 2) return '';
+  const w = 520, alto = 190, pl = 64, pr = 14, pt = 12, pb = 24;
+  const vals = h.flatMap(r => [r.precio, r.promo].filter(x => x != null)), mn = Math.min(...vals) * .97, mx = Math.max(...vals) * 1.03, rg = mx - mn || 1;
+  const X = i => pl + i / (h.length - 1) * (w - pl - pr), Y = x => pt + (1 - (x - mn) / rg) * (alto - pt - pb);
+  let g = '';
+  for (let k = 0; k <= 3; k++){ const x = mn + rg * k / 3; g += `<line x1="${pl}" x2="${w - pr}" y1="${Y(x)}" y2="${Y(x)}" stroke="var(--line)"/><text x="${pl - 6}" y="${Y(x) + 4}" text-anchor="end">${plataR(x)}</text>`; }
+  const paso = Math.ceil(h.length / 6);
+  h.forEach((r, i) => { if (i % paso === 0 || i === h.length - 1) g += `<text x="${X(i)}" y="${alto - 6}" text-anchor="middle">${fCortaD(r.fecha)}</text>`; });
+  if (h.some(r => r.promo != null)) g += `<polyline points="${h.map((r, i) => X(i) + ',' + Y(efectivo(r))).join(' ')}" fill="none" stroke="var(--verde)" stroke-width="2" stroke-dasharray="5 4"/>`;
+  g += `<polyline points="${h.map((r, i) => X(i) + ',' + Y(r.precio)).join(' ')}" fill="none" stroke="var(--dia)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  h.forEach((r, i) => g += `<circle cx="${X(i)}" cy="${Y(r.precio)}" r="3.5" fill="var(--dia)"><title>${fLargaD(r.fecha)}: ${plata(r.precio)}${r.promo != null ? ' · con promo ' + plata(r.promo) : ''}${r.disponible === false ? ' · sin stock' : ''}</title></circle>`);
+  return `<svg viewBox="0 0 ${w} ${alto}" width="100%" role="img" class="grafico">${g}</svg>
+    <div class="ley"><span><i style="background:var(--dia)"></i>Precio</span>${h.some(r => r.promo != null) ? '<span><i style="background:var(--verde)"></i>Con la promo</span>' : ''}</div>`;
+}
+function tablaSemanas(h){
+  const s = porSemana(h);
+  if (s.length < 2) return '';
+  return `<table class="tabla"><thead><tr><th>Semana del</th><th class="n">Precio</th><th class="n">Contra la anterior</th></tr></thead><tbody>
+    ${s.map((r, i) => `<tr><td>${fLargaD(r.lunes)}${r.promoNombre ? ` <span class="mini-promo">${esc(r.promoNombre)}</span>` : ''}</td><td class="n">${plata(r.precio)}</td><td class="n">${i ? flechaTxt(variacion(r.precio, s[i - 1].precio)) : '—'}</td></tr>`).reverse().join('')}
+  </tbody></table>`;
+}
+const proximoLunes = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'numeric'}); };
+
+async function vLista(forzar){
+  V.innerHTML = `<h1>Mi lista</h1><p class="bajada">Los productos que seguís en ${esc(nombreTienda())}. Sus precios se guardan solos todos los días a las 9, aunque no abras la app.</p><div data-resultado>${esqueleto(4)}</div>`;
+  cargar(j => {
+    HIST = j.historia || {};
+    // Lo que se había marcado en este equipo antes de que la lista viviera en la base, se sube una sola vez
+    const enBase = new Set((j.seguidos || []).map(s => s.item_id));
+    const viejos = Object.entries(st.seguidos).filter(([id, s]) => !enBase.has(id) && !s.subiendo);
+    if (viejos.length){
+      viejos.forEach(([, s]) => s.subiendo = true);
+      Promise.all(viejos.map(([id, s]) => api({do:'seguir', tienda:tiendaParam(), id, nombre:s.nombre || '', imagen:s.imagen || ''}, true).catch(() => {})))
+        .then(() => { olvidarLista(); if (st.tab === 'lista') dibujar(true); });
+    }
+    st.seguidos = Object.fromEntries((j.seguidos || []).map(s => [s.item_id, {nombre:s.nombre, imagen:s.imagen, fecha:s.agregado, precio:(HIST[s.item_id] || [])[0]?.precio}]));
+    for (const [id, s] of viejos) st.seguidos[id] = s;
+    guardar();
+    const R = V.querySelector('[data-resultado]');
+    if (!(j.seguidos || []).length && !viejos.length){ R.innerHTML = `<div class="vacio">Tocá la ☆ de cualquier producto para seguir su precio.<br>Desde ese día se guarda su precio todos los días y acá ves cómo va subiendo o bajando.</div>`; return; }
+    const ps = j.productos.map(p => ({...p, h: HIST[p.id] || []}));
+    ps.forEach(p => enPantalla.set(p.id, p));
+    // ----- resumen: sólo con lo que está guardado -----
+    const fechas = [...new Set(Object.values(HIST).flat().map(r => r.fecha))].sort();
+    const sem = ps.map(p => ({p, s:porSemana(p.h)})).filter(x => x.s.length >= 2);
+    let resumen = `<div class="stat"><b>${ps.length}</b><span>productos que seguís</span></div>
+      <div class="stat"><b>${fechas.length}</b><span>${fechas.length === 1 ? 'día guardado' : 'días guardados'}${fechas.length ? ' desde el ' + fLargaD(fechas[0]) : ''}</span></div>`;
+    let notaSem = '';
+    if (sem.length){
+      const ult = sem.map(x => ({p:x.p, a:x.s[x.s.length - 1], b:x.s[x.s.length - 2]}));
+      const baj = ult.filter(x => x.a.precio < x.b.precio).length, sub = ult.filter(x => x.a.precio > x.b.precio).length;
+      const tA = ult.reduce((s, x) => s + x.a.precio, 0), tB = ult.reduce((s, x) => s + x.b.precio, 0);
+      resumen += `<div class="stat"><b class="${tA < tB ? 'baja' : tA > tB ? 'sube' : ''}">${tA === tB ? '=' : (tA < tB ? '▼ ' : '▲ ') + pct(variacion(tA, tB))}</b><span>tu lista esta semana contra la anterior (${plata(Math.round(tA))} vs ${plata(Math.round(tB))})</span></div>
+        <div class="stat"><b><span class="baja">▼${baj}</span> <span class="sube">▲${sub}</span></b><span>bajaron y subieron esta semana</span></div>`;
+    } else notaSem = `<p class="nota">📅 La comparación semana a semana aparece cuando haya dos semanas guardadas: a partir del ${proximoLunes()}.</p>`;
+    // ----- un renglón por producto, con su traza -----
+    const filas = ps.slice().sort((a, b) => {
+      const ca = a.h.length ? variacion(a.precio, a.h[0].precio) : 0, cb = b.h.length ? variacion(b.precio, b.h[0].precio) : 0;
+      return ca - cb;
+    }).map(p => {
+      const ini = p.h[0], s = porSemana(p.h);
+      const desde = ini ? variacion(p.precio, ini.precio) : 0;
+      const sem = s.length >= 2 ? variacion(s[s.length - 1].precio, s[s.length - 2].precio) : null;
+      return `<div class="lseg" data-id="${p.id}">
+        <img src="${esc(p.imagen)}" alt="" loading="lazy">
+        <div class="lnom"><b>${esc(p.nombre)}</b>
+          <div class="ltags">${p.disponible ? '' : '<span class="flag rojo">Sin stock en tu tienda</span>'}${p.llevando2 ? `<span class="flag verde">${esc(p.promoNombre || 'Promo')}: ${plata(p.llevando2)} c/u</span>` : ''}${p.descuento >= 1 ? `<span class="flag rojo">−${pct(p.descuento)}</span>` : ''}</div>
+          <div class="ldesde">${ini ? (Math.abs(desde) < .05 ? `= Igual que el ${fLargaD(ini.fecha)}` : `${flechaTxt(desde)} desde el ${fLargaD(ini.fecha)} (${plata(ini.precio)})`) : ''}</div></div>
+        <div class="ltraza">${traza(p.h)}</div>
+        <div class="lprecio"><b>${plata(p.precio)}</b>${sem != null ? `<small>semana: ${flechaTxt(sem)}</small>` : ''}</div>
+        <button class="star on" data-seguir="${p.id}" title="Dejar de seguir">★</button>
+      </div>`;
+    }).join('');
+    R.innerHTML = `<div class="fila" style="margin-bottom:8px">${cabeceraHora(j)}</div><div class="stats">${resumen}</div>${notaSem}<div class="lsegs">${filas}</div>`;
+  }, {do:'seguidos', tienda:tiendaParam()}, forzar);
+}
+function olvidarLista(){
+  const k = JSON.stringify({do:'seguidos', tienda:tiendaParam()});
+  memo.delete(k);
+  const c = leer(LSC, {}); delete c[k]; try { localStorage.setItem(LSC, JSON.stringify(c)); } catch(e){}
+}
+
+let busTiendas = {lista:[], cargando:false, error:''};
+async function vTienda(){
+  const b = busTiendas;
+  V.innerHTML = `<h1>Elegí tu tienda</h1><p class="bajada">Ahora: <b>${esc(nombreTienda())}</b>. Buscá por código postal y tocá la tuya.</p>
+    <form class="buscar" id="fTienda"><input id="cp" inputmode="numeric" placeholder="Código postal" value="${esc(st.cp)}"><button>Buscar</button></form>
+    ${b.cargando ? '<div class="vacio">Buscando tiendas…</div>' : b.error ? `<div class="error">${esc(b.error)}</div>`
+      : b.lista.map((t, i) => { const on = t.seller === st.tienda.seller; return `<div class="tienda ${on ? 'on' : ''}"><div><b>${esc(nombreTienda(t))}</b><br><small>${esc(t.localidad)} · a ${String(t.distanciaKm).replace('.', ',')} km</small></div><button data-elegir="${i}">${on ? '✓ Mi tienda' : 'Elegir'}</button></div>`; }).join('')}`;
+}
+async function buscarTiendas(){
+  busTiendas = {lista:[], cargando:true, error:''}; vTienda();
+  try { busTiendas.lista = (await api({do:'tiendas', cp:st.cp})).tiendas || []; if (!busTiendas.lista.length) busTiendas.error = 'No hay tiendas Día con retiro cerca de ese código postal.'; }
+  catch(e){ busTiendas.error = 'No se pudieron traer las tiendas: ' + e.message; }
+  busTiendas.cargando = false; if (st.tab === 'tienda') vTienda();
+}
+
+/* ---------- Detalle (hoja) ---------- */
+function abrirDetalle(p){
+  const seg = !!st.seguidos[p.id];
+  const r = [];
+  r.push(['Precio hoy', plata(p.precio)]);
+  if (p.lista > p.precio) r.push(['Precio de lista', `${plata(p.lista)} · ahorrás ${plata(p.lista - p.precio)} (−${pct(p.descuento)})`]);
+  const n = p.promoCant || 2;
+  if (p.llevando2) r.push([`Promo ${esc(p.promoNombre || '')}`, `llevando ${n}: ${plata(p.llevando2)} c/u · ${plata(p.llevando2 * n)} en total (ahorrás ${plata((p.precio - p.llevando2) * n)})`]);
+  if (p.porUnidad) r.push([`Precio por ${p.unidad === 'kg' ? 'kilo' : 'litro'}`, plataR(p.porUnidad) + (p.porUnidad2 ? ` (${plataR(p.porUnidad2)} con la promo)` : '')]);
+  r.push(['Stock en tu tienda', p.disponible ? '✓ Hay para retirar' : '✗ No hay']);
+  const h = HIST[p.id] || [];
+  if (h.length) r.push(['Primer precio guardado', `${plata(h[0].precio)} (${fLargaD(h[0].fecha)}) · ${Math.abs(variacion(p.precio, h[0].precio)) < .05 ? 'igual' : flechaTxt(variacion(p.precio, h[0].precio))}`]);
+  const notas = [];
+  if (p.motivoBajo === 'otros') notas.push('<b>🚨 Precio muy bajo:</b> el mismo producto (mismo código de barras) cuesta más del doble en otros supermercados. Puede ser un error de carga: si te sirve, conviene comprarlo antes de que lo corrijan.');
+  if (p.motivoBajo === 'lista') notas.push('<b>🚨 Precio muy bajo:</b> cuesta 90% menos o más que su propio precio de lista. Puede ser un error de carga o una liquidación.');
+  if (p.descuento >= REBAJA_GRANDE) notas.push('<b>Rebaja enorme:</b> suele ser liquidación (fin de temporada o vencimiento cercano) o un error de carga.');
+  document.getElementById('hoja').innerHTML = `<button class="cierra" data-cerrar>✕</button>
+    <div class="img"><img src="${esc(p.imagen)}" alt=""></div>
+    <h2>${esc(p.nombre)}</h2>
+    ${r.map(([a, b]) => `<div class="renglon"><span>${a}</span><span>${b}</span></div>`).join('')}
+    ${notas.map(n => `<p class="explica">${n}</p>`).join('')}
+    ${seg ? (h.length >= 2 ? `<h3 class="subt">Cómo vino su precio</h3>${graficoHist(h)}${tablaSemanas(h) || `<p class="explica">La tabla semana a semana aparece cuando haya dos semanas guardadas.</p>`}`
+      : `<p class="explica">📅 Su precio se guarda solo todos los días a las 9. Desde mañana se empieza a ver la traza de cómo sube o baja.</p>`) : ''}
+    <p class="explica">Precio y stock de la web de Día para retiro en ${esc(nombreTienda())}. En la góndola puede variar.</p>
+    <div class="botones"><button class="${seg ? '' : 'pri'}" data-seguir="${p.id}">${seg ? '★ Dejar de seguir' : '☆ Seguir su precio'}</button>${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener">Ver en la web de Día ↗</a>` : ''}</div>`;
+  document.getElementById('velo').classList.add('on');
+}
+function cerrarDetalle(){ document.getElementById('velo').classList.remove('on'); }
+
+/* ---------- Navegación y eventos ---------- */
+const VISTAS = {ofertas:vOfertas, rubros:vRubros, buscar:vBuscar, lista:vLista, tienda:vTienda};
+function dibujar(forzar){
+  document.getElementById('tiendaTxt').textContent = nombreTienda();
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === st.tab));
+  enPantalla = new Map();
+  Promise.resolve(VISTAS[st.tab](forzar)).then(() => {
+    // que el rubro elegido se vea aunque la fila de botones sea más ancha que la pantalla
+    document.querySelectorAll('.chips').forEach(c => { const on = c.querySelector('.on'); if (on){ c.style.scrollBehavior = 'auto'; c.scrollLeft = on.offsetLeft - c.clientWidth / 2 + on.offsetWidth / 2; c.style.scrollBehavior = ''; } });
+    prepararChips();
+  });
+}
+
+/* ---------- Filas de botones deslizables (iguales en computadora y celular) ---------- */
+const filaChips = html => `<div class="chipsWrap"><button class="flecha izq" data-flecha="-1" aria-label="Ver anteriores">‹</button><div class="chips">${html}</div><button class="flecha der" data-flecha="1" aria-label="Ver más">›</button></div>`;
+function prepararChips(){
+  document.querySelectorAll('.chipsWrap').forEach(w => {
+    const c = w.querySelector('.chips');
+    w.classList.toggle('puedeIzq', c.scrollLeft > 4);
+    w.classList.toggle('puedeDer', c.scrollLeft + c.clientWidth < c.scrollWidth - 4);
+  });
+}
+document.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('chips')) prepararChips(); }, true);
+window.addEventListener('resize', prepararChips);
+// rueda del mouse: mueve la fila de costado
+document.addEventListener('wheel', e => {
+  const c = e.target.closest && e.target.closest('.chips');
+  if (!c || c.scrollWidth <= c.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  e.preventDefault(); c.style.scrollBehavior = 'auto'; c.scrollLeft += e.deltaY; c.style.scrollBehavior = '';
+}, {passive:false});
+// arrastrar con el mouse (en el celular ya se desliza con el dedo)
+let arrastre = null;
+document.addEventListener('pointerdown', e => {
+  const c = e.target.closest && e.target.closest('.chips');
+  if (!c || e.pointerType !== 'mouse') return;
+  arrastre = {c, x:e.clientX, sl:c.scrollLeft, movio:false};
+});
+document.addEventListener('pointermove', e => {
+  if (!arrastre) return;
+  const dx = e.clientX - arrastre.x;
+  if (Math.abs(dx) > 5){ arrastre.movio = true; arrastre.c.classList.add('arrastrando'); }
+  if (arrastre.movio) arrastre.c.scrollLeft = arrastre.sl - dx;
+});
+document.addEventListener('pointerup', () => { if (!arrastre) return; const a = arrastre; arrastre = null; a.c.classList.remove('arrastrando'); if (a.movio) window.__sinClic = Date.now(); });
+// si se arrastró, ese "clic" no elige un rubro
+document.addEventListener('click', e => { if (window.__sinClic && Date.now() - window.__sinClic < 300 && e.target.closest('.chips')){ e.stopPropagation(); e.preventDefault(); } }, true);
+function ir(t){ st.tab = t; guardar(); dibujar(); window.scrollTo({top:0}); }
+function aviso(t){ const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(aviso.t); aviso.t = setTimeout(() => el.classList.remove('on'), 2400); }
+
+function pintarEstrellas(id){
+  document.querySelectorAll(`[data-seguir="${id}"]`).forEach(b => { const on = !!st.seguidos[id]; b.classList.toggle('on', on); if (b.classList.contains('star')) b.textContent = on ? '★' : '☆'; else { b.textContent = on ? '★ Dejar de seguir' : '☆ Seguir su precio'; b.classList.toggle('pri', !on); } });
+}
+// Seguir / dejar de seguir: se guarda en la base (así la tarea diaria lo incluye y se ve en todos los equipos)
+async function seguir(id){
+  const p = enPantalla.get(id), si = !st.seguidos[id], antes = st.seguidos[id];
+  if (si && !p) return;
+  if (si) st.seguidos[id] = {precio:p.precio, fecha:new Date().toISOString(), nombre:p.nombre, imagen:p.imagen}; else delete st.seguidos[id];
+  guardar(); pintarEstrellas(id); olvidarLista();
+  aviso(si ? 'Lo agregaste a Mi lista ⭐ — su precio se guarda todos los días' : 'Ya no lo seguís');
+  if (!si && st.tab === 'lista'){ const f = V.querySelector(`.lseg[data-id="${id}"]`); if (f) f.remove(); }
+  try { await api({do:'seguir', tienda:tiendaParam(), id, nombre:(p || antes || {}).nombre || '', imagen:(p || antes || {}).imagen || '', si}, true); }
+  catch(e){ if (si) delete st.seguidos[id]; else st.seguidos[id] = antes; guardar(); pintarEstrellas(id); aviso('No se pudo guardar en Mi lista: ' + e.message); }
+}
+
+document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (b) ir(b.dataset.t); };
+document.getElementById('btnTienda').onclick = () => { ir('tienda'); if (!busTiendas.lista.length) buscarTiendas(); };
+document.getElementById('velo').addEventListener('click', e => {
+  if (e.target.id === 'velo' || e.target.closest('[data-cerrar]')) return cerrarDetalle();
+  const s = e.target.closest('[data-seguir]'); if (s) seguir(s.dataset.seguir);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarDetalle(); });
+
+V.addEventListener('click', e => {
+  const t = e.target;
+  const fl = t.closest('[data-flecha]');
+  if (fl){ const c = fl.parentElement.querySelector('.chips'); c.scrollBy({left: +fl.dataset.flecha * c.clientWidth * 0.7}); return; }
+  const s = t.closest('[data-seguir]'); if (s){ e.stopPropagation(); seguir(s.dataset.seguir); return; }
+  const a = t.closest('[data-accion]');
+  if (a){ const k = a.dataset.accion;
+    if (k === 'refrescar') dibujar(true);
+    else if (k === 'verSin'){ st.soloStock = !st.soloStock; guardar(); dibujar(); }
+    else if (k === 'limpiarRubQ'){ st.rubQ = ''; guardar(); dibujar(); }
+    return; }
+  const oc = t.closest('[data-ofcat]'); if (oc){ st.ofCat = oc.dataset.ofcat; guardar(); dibujar(); return; }
+  const r1 = t.closest('[data-rub]'); if (r1){ st.rub = [+r1.dataset.rub]; st.rubQ = ''; guardar(); dibujar(); window.scrollTo({top:0}); return; }
+  const rp = t.closest('[data-rubpath]'); if (rp){ st.rub = [st.rub[0], ...rp.dataset.rubpath.split(',').map(Number)]; st.rubQ = ''; guardar(); dibujar(); window.scrollTo({top:0}); return; }
+  const rv = t.closest('[data-rubvolver]'); if (rv){ st.rub = st.rub.slice(0, +rv.dataset.rubvolver); st.rubQ = ''; guardar(); dibujar(); return; }
+  const el = t.closest('[data-elegir]');
+  if (el){ const ti = busTiendas.lista[+el.dataset.elegir]; if (ti){ st.tienda = {seller:ti.seller, nombre:ti.nombre, direccion:ti.direccion, localidad:ti.localidad, geo:ti.geo}; guardar(); aviso('Tu tienda: ' + nombreTienda()); ir('ofertas'); } return; }
+  const pc = t.closest('.pc[data-id], .lseg[data-id]'); if (pc && enPantalla.has(pc.dataset.id)) abrirDetalle(enPantalla.get(pc.dataset.id));
+});
+V.addEventListener('change', e => { if (e.target.id === 'selOrden'){ st.orden = e.target.value; guardar(); dibujar(); } });
+V.addEventListener('submit', e => {
+  e.preventDefault();
+  if (e.target.id === 'fBuscar'){ st.q = document.getElementById('fBuscarQ').value.trim(); guardar(); if (st.q.length >= 2) dibujar(); }
+  if (e.target.id === 'fRubro'){ st.rubQ = document.getElementById('fRubroQ').value.trim(); guardar(); dibujar(); }
+  if (e.target.id === 'fTienda'){ st.cp = document.getElementById('cp').value.replace(/\D/g, ''); guardar(); if (st.cp.length >= 4) buscarTiendas(); else aviso('Escribí un código postal de 4 números'); }
+});
+
+// Botón Atrás del celular (lo llama la app Android): primero cierra lo abierto. Devuelve true si lo resolvió acá.
+window.atrasApp = function(){
+  if (document.getElementById('velo').classList.contains('on')){ cerrarDetalle(); return true; }
+  if (st.tab === 'rubros' && st.rub.length){ st.rub = st.rub.slice(0, -1); st.rubQ = ''; guardar(); dibujar(); return true; }
+  if (st.tab !== 'ofertas'){ ir('ofertas'); return true; }
+  return false;
+};
+// Acceso directo por la dirección: #ofertas, #rubros/80,95,102, #buscar/yerba, #lista (y ?orden=unidad)
+(function(){
+  const [t, arg] = decodeURIComponent(location.hash.slice(1)).split('/');
+  if (!VISTAS[t]) return;
+  st.tab = t;
+  if (t === 'rubros' && arg) st.rub = arg.split(',').map(Number).filter(Boolean);
+  if (t === 'buscar' && arg) st.q = arg;
+  const o = new URLSearchParams(location.search).get('orden'); if (o && EXPLICA[o]) st.orden = o;
+})();
+dibujar();
+</script>
+</body>
+</html>

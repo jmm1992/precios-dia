@@ -1,0 +1,42 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'ar.preciosdia'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'ar.preciosdia'
+        minSdk 26
+        targetSdk 34
+        versionCode 2
+        versionName '1.1'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../preciosdia.keystore')
+            // Las claves viven en android/firma.properties, que no se sube (el repositorio es público)
+            def f = new Properties(); f.load(new FileInputStream(rootProject.file('firma.properties')))
+            storePassword f['storePassword']
+            keyAlias 'preciosdia'
+            keyPassword f['keyPassword']
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+        debug { signingConfig signingConfigs.release }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint { checkReleaseBuilds false; abortOnError false }
+}
+
+// La pantalla es ../../index.html (la misma que se abre en la PC): se copia adentro de la app en cada compilación,
+// así hay un solo archivo para mantener.
+tasks.register('copiarPagina', Copy) {
+    from('../../index.html')
+    into('src/main/assets')
+}
+preBuild.dependsOn('copiarPagina')

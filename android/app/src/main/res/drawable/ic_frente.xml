@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El "$" blanco del logo, dibujado con trazos dentro de la zona segura del ícono (66 de 108 en el centro) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M54,27 L54,81" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="7.5" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M67,40 C63,35.5 58.5,34 54,34 C46.5,34 41,38 41,44 C41,50.5 47,52.5 54,54 C61.5,55.5 67,58 67,64.5 C67,70.5 61.5,74 54,74 C48.5,74 43.5,72 40,67.5" />
+</vector>

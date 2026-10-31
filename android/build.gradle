@@ -1,0 +1,7 @@
+// Precios Día: la app es la misma página de ../index.html adentro de un WebView.
+// Java puro, sin librerías: todo sale del propio Android (igual que Descanso).
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.9.1' }
+}
+allprojects { repositories { google(); mavenCentral() } }
