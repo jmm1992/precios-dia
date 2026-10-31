@@ -192,6 +192,11 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .cuenta label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
 .cuenta input{width:100%;box-sizing:border-box;font:inherit;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg, var(--card));color:var(--ink)}
 .cuenta .botones{margin-top:16px}
+.cuenta .conOjo{position:relative}
+.cuenta .conOjo input{padding-right:48px}
+.cuenta .ojo{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--mut);display:grid;place-items:center;border-radius:10px;cursor:pointer}
+.cuenta .ojo svg{width:22px;height:22px}
+.cuenta .ojo.on{color:var(--ink)}
 .quien{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut);margin:-4px 0 10px}
 .quien button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 12px;font-weight:600}
 /* Cartel propio de "hay una versión nueva" de la app */
@@ -254,7 +259,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
 // Versión de la página (cambiarla al publicar) y de la app de Android (la app la agrega al "user agent")
-const VERSION_PAGINA = '31/10 20:55';
+const VERSION_PAGINA = '31/10 21:10';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
@@ -486,11 +491,14 @@ function tablaSemanas(h){
 const proximoLunes = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'numeric'}); };
 
 const cuerpoLista = () => ({do:'seguidos', tienda:tiendaParam(), pase:CTA && CTA.pase});
+// El ojito de la contraseña: abierto = se ve lo escrito; tachado = oculto
+const OJO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OJO_NO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7c2 0 3.8.7 5.2 1.6M22 12s-3.6 7-10 7c-2 0-3.8-.7-5.2-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>';
 function vCuenta(){
   V.innerHTML = `<h1>Mi lista</h1><p class="bajada">Para seguir precios entrá con tu cuenta. Cada cuenta tiene su propia lista y sus precios se guardan solos todos los días a las 9.</p>
     <form class="cuenta" id="fCuenta" autocomplete="on">
       <label for="cUsuario">Usuario</label><input id="cUsuario" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required>
-      <label for="cClave">Contraseña</label><input id="cClave" name="password" type="password" autocomplete="current-password" minlength="6" required>
+      <label for="cClave">Contraseña</label><div class="conOjo"><input id="cClave" name="password" type="password" autocomplete="current-password" minlength="6" required><button type="button" class="ojo" data-accion="verClave" aria-label="Mostrar la contraseña" title="Mostrar la contraseña">${OJO}</button></div>
       <div class="botones"><button class="pri" value="entrar">Entrar</button><button value="crearCuenta">Crear cuenta</button></div>
       <p class="nota" id="cMsg">${pendienteSeguir ? 'Después de entrar se agrega a tu lista: <b>' + esc(pendienteSeguir.nombre) + '</b>.' : 'Si es la primera vez, escribí el usuario y la contraseña que quieras y tocá <b>Crear cuenta</b>.'}</p>
     </form><p class="nota" style="text-align:center;margin-top:18px">${versiones()}</p>`;
@@ -710,6 +718,9 @@ V.addEventListener('click', e => {
     if (k === 'refrescar') dibujar(true);
     else if (k === 'verSin'){ st.soloStock = !st.soloStock; guardar(); dibujar(); }
     else if (k === 'limpiarRubQ'){ st.rubQ = ''; guardar(); dibujar(); }
+    else if (k === 'verClave'){ const i = document.getElementById('cClave'), ver = i.type === 'password';
+      i.type = ver ? 'text' : 'password'; a.innerHTML = ver ? OJO_NO : OJO; a.classList.toggle('on', ver);
+      a.setAttribute('aria-label', ver ? 'Ocultar la contraseña' : 'Mostrar la contraseña'); a.title = a.getAttribute('aria-label'); i.focus(); }
     else if (k === 'salir'){ salirCuenta(); aviso('Saliste de tu cuenta'); dibujar(); }
     return; }
   const oc = t.closest('[data-ofcat]'); if (oc){ st.ofCat = oc.dataset.ofcat; guardar(); dibujar(); return; }
