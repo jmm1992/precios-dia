@@ -244,6 +244,7 @@ const REBAJA_GRANDE = 60;   // % de descuento desde el que se avisa "rebaja enor
 const LS = 'preciosDia:v4';
 const leer = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
 let st = Object.assign({tienda:TIENDA_DEF, tab:'ofertas', ofCat:'', rub:[], rubQ:'', orden:'descuento', soloStock:true, q:'', seguidos:{}, cp:'1766'}, leer(LS, {}));
+st.q = ''; st.rubQ = '';   // lo escrito en los buscadores no se guarda: al volver a abrir arrancan vacíos
 const guardar = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch(e){} };
 // La cuenta (usuario y pase firmado por el servidor). Mi lista es de cada cuenta; lo demás se ve sin entrar.
 const LSU = 'preciosDia:cuenta';
@@ -259,7 +260,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
 // Versión de la página (cambiarla al publicar) y de la app de Android (la app la agrega al "user agent")
-const VERSION_PAGINA = '31/10 21:10';
+const VERSION_PAGINA = '31/10 21:15';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
@@ -672,7 +673,8 @@ document.addEventListener('pointermove', e => {
 document.addEventListener('pointerup', () => { if (!arrastre) return; const a = arrastre; arrastre = null; a.c.classList.remove('arrastrando'); if (a.movio) window.__sinClic = Date.now(); });
 // si se arrastró, ese "clic" no elige un rubro
 document.addEventListener('click', e => { if (window.__sinClic && Date.now() - window.__sinClic < 300 && e.target.closest('.chips')){ e.stopPropagation(); e.preventDefault(); } }, true);
-function ir(t){ st.tab = t; guardar(); dibujar(); window.scrollTo({top:0}); }
+function ir(t){ if (t !== st.tab){ st.q = ''; st.rubQ = ''; }   // al cambiar de pestaña, los buscadores se vacían
+  st.tab = t; guardar(); dibujar(); window.scrollTo({top:0}); }
 function aviso(t){ const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(aviso.t); aviso.t = setTimeout(() => el.classList.remove('on'), 2400); }
 
 function pintarEstrellas(id){
