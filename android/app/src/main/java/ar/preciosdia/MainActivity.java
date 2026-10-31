@@ -21,6 +21,7 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
     static final String WEB = "https://jmm1992.github.io/precios-dia/";
     static final String COPIA = "file:///android_asset/index.html";
+    static final String APP_DIA = "ar.com.supermercadosdia.customers";   // la app Día Online (sale de assetlinks.json de su web)
     private WebView web;
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -40,6 +41,10 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
                 if ("file".equals(u.getScheme()) || u.toString().startsWith(WEB)) return false;
+                // Un producto de Día se abre en la app de Día si está instalada (ahí está la sesión y la tienda del usuario)
+                if ("diaonline.supermercadosdia.com.ar".equals(u.getHost())) {
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, u).setPackage(APP_DIA)); return true; } catch (Exception sinApp) { /* va al navegador */ }
+                }
                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
                 return true;
             }

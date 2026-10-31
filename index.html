@@ -118,10 +118,10 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .miga button{border:0;background:none;color:var(--azul);padding:0;font-size:13.5px}
 
 /* Mi lista: resumen, renglones con traza y detalle con historia */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:10px;margin-bottom:12px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
-.stat b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
-.stat span{font-size:12.5px;color:var(--mut)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:8px;margin-bottom:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 11px;display:flex;align-items:baseline;gap:7px}
+.stat b{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat span{font-size:12px;color:var(--mut);line-height:1.25}
 .lsegs{display:flex;flex-direction:column;gap:8px}
 .lseg{display:grid;grid-template-columns:56px minmax(0,1fr) 140px auto 36px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;position:relative}
 .lseg:hover{border-color:var(--mut)}
@@ -186,6 +186,12 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .botones{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .botones a,.botones button{flex:1 1 160px;text-align:center;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px;font-weight:700;color:var(--ink);text-decoration:none}
 .botones .pri{background:var(--dia);color:#fff;border-color:var(--dia)}
+.cuenta{max-width:420px;margin:6px auto 0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 16px}
+.cuenta label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+.cuenta input{width:100%;box-sizing:border-box;font:inherit;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg, var(--card));color:var(--ink)}
+.cuenta .botones{margin-top:16px}
+.quien{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut);margin:-4px 0 10px}
+.quien button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 12px;font-weight:600}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 @media (max-width:520px){
@@ -225,6 +231,11 @@ const LS = 'preciosDia:v4';
 const leer = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
 let st = Object.assign({tienda:TIENDA_DEF, tab:'ofertas', ofCat:'', rub:[], rubQ:'', orden:'descuento', soloStock:true, q:'', seguidos:{}, cp:'1766'}, leer(LS, {}));
 const guardar = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch(e){} };
+// La cuenta (usuario y pase firmado por el servidor). Mi lista es de cada cuenta; lo demás se ve sin entrar.
+const LSU = 'preciosDia:cuenta';
+let CTA = leer(LSU, null);
+let pendienteSeguir = null;
+if (!CTA) st.seguidos = {};   // el producto que se quiso seguir sin haber entrado: se sigue apenas se entra
 
 /* ---------- Formatos ---------- */
 const plata = v => v == null ? '—' : '$ ' + Number(v).toLocaleString('es-AR', {minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2});
@@ -246,10 +257,10 @@ async function api(cuerpo, forzar){
   try {
     const r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:k, signal:ctrl.signal});
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) throw new Error(j.error || 'el servidor contestó ' + r.status);
+    if (!r.ok || j.error){ const er = new Error(j.error || 'el servidor contestó ' + r.status); er.sesion = !!j.sesion; throw er; }
     memo.set(k, {t:Date.now(), d:j});
     return j;
-  } catch(e){ throw new Error(e.name === 'AbortError' ? 'Día tardó demasiado en contestar' : e.message === 'Failed to fetch' ? 'sin conexión a internet' : e.message); }
+  } catch(e){ if (e.sesion) throw e; throw new Error(e.name === 'AbortError' ? 'Día tardó demasiado en contestar' : e.message === 'Failed to fetch' ? 'sin conexión a internet' : e.message); }
   finally { clearTimeout(to); }
 }
 let RUBROS = null;
@@ -325,6 +336,7 @@ async function cargar(render, cuerpo, forzar){
     render(j); prepararChips();
   } catch(e){
     if (yo !== pedido) return;
+    if (e.sesion && st.tab === 'lista'){ salirCuenta(); aviso(e.message); return vLista(); }
     if (viejo){ const a = V.querySelector('.actualizando'); if (a) a.textContent = 'No se pudo actualizar (' + e.message + '). '; return; }
     V.querySelector('[data-resultado]').innerHTML = `<div class="error">No se pudo consultar a Día: ${esc(e.message)}. <button class="nota" data-accion="refrescar" style="border:0;background:none;color:inherit;text-decoration:underline">Reintentar</button></div>`;
   }
@@ -392,7 +404,7 @@ async function vRubros(forzar){
   const actual = n3 || n2 || n1;
   // En el rubro se ven TODAS sus secciones con sus sub-secciones; adentro de una sección, sus sub-secciones
   const secciones = !n2
-    ? `<details class="secciones" open><summary>Secciones <small>${n1.hijos.length}</small></summary>${n1.hijos.map(h => `<div class="secFila"><button class="nomSec" data-rubpath="${h.id}">${esc(h.nombre)} ›</button><div class="subs">${h.hijos.map(n => `<button data-rubpath="${h.id},${n.id}">${esc(n.nombre)}</button>`).join('')}</div></div>`).join('')}</details>`
+    ? `<details class="secciones"${st.secCerradas ? '' : ' open'}><summary>Secciones <small>${n1.hijos.length}</small></summary>${n1.hijos.map(h => `<div class="secFila"><button class="nomSec" data-rubpath="${h.id}">${esc(h.nombre)} ›</button><div class="subs">${h.hijos.map(n => `<button data-rubpath="${h.id},${n.id}">${esc(n.nombre)}</button>`).join('')}</div></div>`).join('')}</details>`
     : n2.hijos.length ? filaChips(`<button data-rubpath="${n2.id}" class="${!n3 ? 'on' : ''}">Todo ${esc(n2.nombre)}</button>${n2.hijos.map(h => `<button data-rubpath="${n2.id},${h.id}" class="${n3 && n3.id === h.id ? 'on' : ''}">${esc(h.nombre)}</button>`).join('')}`) : '';
   V.innerHTML = `
     <div class="miga"><button data-rubvolver="0">Rubros</button> › ${n2 ? `<button data-rubvolver="1">${esc(n1.nombre)}</button>` : esc(n1.nombre)}${n2 ? ' › ' + (n3 ? `<button data-rubvolver="2">${esc(n2.nombre)}</button>` : esc(n2.nombre)) : ''}${n3 ? ' › ' + esc(n3.nombre) : ''}</div>
@@ -461,29 +473,50 @@ function tablaSemanas(h){
 }
 const proximoLunes = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'numeric'}); };
 
+const cuerpoLista = () => ({do:'seguidos', tienda:tiendaParam(), pase:CTA && CTA.pase});
+function vCuenta(){
+  V.innerHTML = `<h1>Mi lista</h1><p class="bajada">Para seguir precios entrá con tu cuenta. Cada cuenta tiene su propia lista y sus precios se guardan solos todos los días a las 9.</p>
+    <form class="cuenta" id="fCuenta" autocomplete="on">
+      <label for="cUsuario">Usuario</label><input id="cUsuario" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required>
+      <label for="cClave">Contraseña</label><input id="cClave" name="password" type="password" autocomplete="current-password" minlength="6" required>
+      <div class="botones"><button class="pri" value="entrar">Entrar</button><button value="crearCuenta">Crear cuenta</button></div>
+      <p class="nota" id="cMsg">${pendienteSeguir ? 'Después de entrar se agrega a tu lista: <b>' + esc(pendienteSeguir.nombre) + '</b>.' : 'Si es la primera vez, escribí el usuario y la contraseña que quieras y tocá <b>Crear cuenta</b>.'}</p>
+    </form>`;
+}
+async function entrarCuenta(accion){
+  const usuario = document.getElementById('cUsuario').value.trim(), clave = document.getElementById('cClave').value;
+  const msg = document.getElementById('cMsg'), bs = V.querySelectorAll('#fCuenta button');
+  bs.forEach(b => b.disabled = true); msg.textContent = accion === 'entrar' ? 'Entrando…' : 'Creando la cuenta…';
+  try {
+    const j = await api({do:accion, usuario, clave}, true);
+    CTA = {pase:j.pase, usuario:j.usuario}; try { localStorage.setItem(LSU, JSON.stringify(CTA)); } catch(e){}
+    st.seguidos = {}; guardar();
+    aviso(accion === 'entrar' ? 'Hola, ' + j.usuario : 'Cuenta creada' + (j.migrados ? ': tus ' + j.migrados + ' productos pasaron a tu lista' : ''));
+    const p = pendienteSeguir; pendienteSeguir = null;
+    if (p){ enPantalla.set(p.id, p); await seguir(p.id); }
+    dibujar(true);
+  } catch(e){ msg.innerHTML = `<span class="error" style="display:block;margin:0">${esc(e.message)}</span>`; bs.forEach(b => b.disabled = false); }
+}
+function salirCuenta(){
+  olvidarLista(); CTA = null; st.seguidos = {}; guardar();
+  try { localStorage.removeItem(LSU); } catch(e){}
+}
 async function vLista(forzar){
-  V.innerHTML = `<h1>Mi lista</h1><p class="bajada">Los productos que seguís en ${esc(nombreTienda())}. Sus precios se guardan solos todos los días a las 9, aunque no abras la app.</p><div data-resultado>${esqueleto(4)}</div>`;
+  if (!CTA) return vCuenta();
+  V.innerHTML = `<h1>Mi lista</h1><p class="bajada">Los productos que seguís en ${esc(nombreTienda())}. Sus precios se guardan solos todos los días a las 9, aunque no abras la app.</p>
+    <div class="quien"><span>Entraste como <b>${esc(CTA.usuario)}</b></span><button data-accion="salir">Salir</button></div><div data-resultado>${esqueleto(4)}</div>`;
   cargar(j => {
     HIST = j.historia || {};
-    // Lo que se había marcado en este equipo antes de que la lista viviera en la base, se sube una sola vez
-    const enBase = new Set((j.seguidos || []).map(s => s.item_id));
-    const viejos = Object.entries(st.seguidos).filter(([id, s]) => !enBase.has(id) && !s.subiendo);
-    if (viejos.length){
-      viejos.forEach(([, s]) => s.subiendo = true);
-      Promise.all(viejos.map(([id, s]) => api({do:'seguir', tienda:tiendaParam(), id, nombre:s.nombre || '', imagen:s.imagen || ''}, true).catch(() => {})))
-        .then(() => { olvidarLista(); if (st.tab === 'lista') dibujar(true); });
-    }
     st.seguidos = Object.fromEntries((j.seguidos || []).map(s => [s.item_id, {nombre:s.nombre, imagen:s.imagen, fecha:s.agregado, precio:(HIST[s.item_id] || [])[0]?.precio}]));
-    for (const [id, s] of viejos) st.seguidos[id] = s;
     guardar();
     const R = V.querySelector('[data-resultado]');
-    if (!(j.seguidos || []).length && !viejos.length){ R.innerHTML = `<div class="vacio">Tocá la ☆ de cualquier producto para seguir su precio.<br>Desde ese día se guarda su precio todos los días y acá ves cómo va subiendo o bajando.</div>`; return; }
+    if (!(j.seguidos || []).length){ R.innerHTML = `<div class="vacio">Tocá la ☆ de cualquier producto para seguir su precio.<br>Desde ese día se guarda su precio todos los días y acá ves cómo va subiendo o bajando.</div>`; return; }
     const ps = j.productos.map(p => ({...p, h: HIST[p.id] || []}));
     ps.forEach(p => enPantalla.set(p.id, p));
     // ----- resumen: sólo con lo que está guardado -----
     const fechas = [...new Set(Object.values(HIST).flat().map(r => r.fecha))].sort();
     const sem = ps.map(p => ({p, s:porSemana(p.h)})).filter(x => x.s.length >= 2);
-    let resumen = `<div class="stat"><b>${ps.length}</b><span>productos que seguís</span></div>
+    let resumen = `<div class="stat"><b data-nseg>${ps.length}</b><span>productos que seguís</span></div>
       <div class="stat"><b>${fechas.length}</b><span>${fechas.length === 1 ? 'día guardado' : 'días guardados'}${fechas.length ? ' desde el ' + fLargaD(fechas[0]) : ''}</span></div>`;
     let notaSem = '';
     if (sem.length){
@@ -512,10 +545,10 @@ async function vLista(forzar){
       </div>`;
     }).join('');
     R.innerHTML = `<div class="fila" style="margin-bottom:8px">${cabeceraHora(j)}</div><div class="stats">${resumen}</div>${notaSem}<div class="lsegs">${filas}</div>`;
-  }, {do:'seguidos', tienda:tiendaParam()}, forzar);
+  }, cuerpoLista(), forzar);
 }
 function olvidarLista(){
-  const k = JSON.stringify({do:'seguidos', tienda:tiendaParam()});
+  const k = JSON.stringify(cuerpoLista());
   memo.delete(k);
   const c = leer(LSC, {}); delete c[k]; try { localStorage.setItem(LSC, JSON.stringify(c)); } catch(e){}
 }
@@ -559,8 +592,17 @@ function abrirDetalle(p){
     ${seg ? (h.length >= 2 ? `<h3 class="subt">Cómo vino su precio</h3>${graficoHist(h)}${tablaSemanas(h) || `<p class="explica">La tabla semana a semana aparece cuando haya dos semanas guardadas.</p>`}`
       : `<p class="explica">📅 Su precio se guarda solo todos los días a las 9. Desde mañana se empieza a ver la traza de cómo sube o baja.</p>`) : ''}
     <p class="explica">Precio y stock de la web de Día para retiro en ${esc(nombreTienda())}. En la góndola puede variar.</p>
-    <div class="botones"><button class="${seg ? '' : 'pri'}" data-seguir="${p.id}">${seg ? '★ Dejar de seguir' : '☆ Seguir su precio'}</button>${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener">Ver en la web de Día ↗</a>` : ''}</div>`;
+    <div class="botones"><button class="${seg ? '' : 'pri'}" data-seguir="${p.id}">${seg ? '★ Dejar de seguir' : '☆ Seguir su precio'}</button>${p.link ? linkDia(p.link) : ''}</div>`;
   document.getElementById('velo').classList.add('on');
+}
+// "Ver en Día": en un celular Android abre la app Día Online si está instalada (ahí está la sesión y la tienda);
+// si no, la web. Dentro de nuestra app (WebView, "; wv)") lo resuelve el lado Android; en el navegador, el enlace intent:// de Chrome.
+const APP_DIA = 'ar.com.supermercadosdia.customers';
+function linkDia(url){
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua) && !/; wv\)/.test(ua) && /^https:\/\//.test(url))
+    return `<a href="${esc(`intent://${url.slice(8)}#Intent;scheme=https;package=${APP_DIA};S.browser_fallback_url=${encodeURIComponent(url)};end`)}">Ver en Día ↗</a>`;
+  return `<a href="${esc(url)}" target="_blank" rel="noopener">Ver en Día ↗</a>`;
 }
 function cerrarDetalle(){ document.getElementById('velo').classList.remove('on'); }
 
@@ -620,12 +662,22 @@ function pintarEstrellas(id){
 async function seguir(id){
   const p = enPantalla.get(id), si = !st.seguidos[id], antes = st.seguidos[id];
   if (si && !p) return;
+  if (!CTA){ pendienteSeguir = p; cerrarDetalle(); ir('lista'); aviso('Entrá o creá tu cuenta para seguir productos'); return; }
   if (si) st.seguidos[id] = {precio:p.precio, fecha:new Date().toISOString(), nombre:p.nombre, imagen:p.imagen}; else delete st.seguidos[id];
   guardar(); pintarEstrellas(id); olvidarLista();
   aviso(si ? 'Lo agregaste a Mi lista ⭐ — su precio se guarda todos los días' : 'Ya no lo seguís');
-  if (!si && st.tab === 'lista'){ const f = V.querySelector(`.lseg[data-id="${id}"]`); if (f) f.remove(); }
-  try { await api({do:'seguir', tienda:tiendaParam(), id, nombre:(p || antes || {}).nombre || '', imagen:(p || antes || {}).imagen || '', si}, true); }
-  catch(e){ if (si) delete st.seguidos[id]; else st.seguidos[id] = antes; guardar(); pintarEstrellas(id); aviso('No se pudo guardar en Mi lista: ' + e.message); }
+  if (!si && st.tab === 'lista'){
+    const f = V.querySelector(`.lseg[data-id="${id}"]`); if (f) f.remove();
+    const n = V.querySelectorAll('.lseg').length, c = V.querySelector('[data-nseg]');
+    if (c) c.textContent = n;
+    if (!n){ const R = V.querySelector('[data-resultado]'); if (R) R.innerHTML = `<div class="vacio">Tocá la ☆ de cualquier producto para seguir su precio.</div>`; }
+  }
+  try {
+    await api({do:'seguir', tienda:tiendaParam(), pase:CTA.pase, id, nombre:(p || antes || {}).nombre || '', imagen:(p || antes || {}).imagen || '', si}, true);
+    // Mi lista se vuelve a pedir por detrás, así el resumen de la semana queda al día sin tocar nada
+    if (st.tab === 'lista') api(cuerpoLista(), true).then(() => { if (st.tab === 'lista' && !document.getElementById('velo').classList.contains('on')) dibujar(); }).catch(() => {});
+  }
+  catch(e){ if (e.sesion){ salirCuenta(); }  if (si) delete st.seguidos[id]; else st.seguidos[id] = antes; guardar(); pintarEstrellas(id); aviso('No se pudo guardar en Mi lista: ' + e.message); }
 }
 
 document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (b) ir(b.dataset.t); };
@@ -646,6 +698,7 @@ V.addEventListener('click', e => {
     if (k === 'refrescar') dibujar(true);
     else if (k === 'verSin'){ st.soloStock = !st.soloStock; guardar(); dibujar(); }
     else if (k === 'limpiarRubQ'){ st.rubQ = ''; guardar(); dibujar(); }
+    else if (k === 'salir'){ salirCuenta(); aviso('Saliste de tu cuenta'); dibujar(); }
     return; }
   const oc = t.closest('[data-ofcat]'); if (oc){ st.ofCat = oc.dataset.ofcat; guardar(); dibujar(); return; }
   const r1 = t.closest('[data-rub]'); if (r1){ st.rub = [+r1.dataset.rub]; st.rubQ = ''; guardar(); dibujar(); window.scrollTo({top:0}); return; }
@@ -655,11 +708,14 @@ V.addEventListener('click', e => {
   if (el){ const ti = busTiendas.lista[+el.dataset.elegir]; if (ti){ st.tienda = {seller:ti.seller, nombre:ti.nombre, direccion:ti.direccion, localidad:ti.localidad, geo:ti.geo}; guardar(); aviso('Tu tienda: ' + nombreTienda()); ir('ofertas'); } return; }
   const pc = t.closest('.pc[data-id], .lseg[data-id]'); if (pc && enPantalla.has(pc.dataset.id)) abrirDetalle(enPantalla.get(pc.dataset.id));
 });
+// Las secciones de un rubro quedan abiertas o cerradas como las dejó (también al volver a dibujar la pantalla)
+V.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('secciones')){ st.secCerradas = !e.target.open; guardar(); } }, true);
 V.addEventListener('change', e => { if (e.target.id === 'selOrden'){ st.orden = e.target.value; guardar(); dibujar(); } });
 V.addEventListener('submit', e => {
   e.preventDefault();
   if (e.target.id === 'fBuscar'){ st.q = document.getElementById('fBuscarQ').value.trim(); guardar(); if (st.q.length >= 2) dibujar(); }
   if (e.target.id === 'fRubro'){ st.rubQ = document.getElementById('fRubroQ').value.trim(); guardar(); dibujar(); }
+  if (e.target.id === 'fCuenta'){ entrarCuenta(e.submitter && e.submitter.value === 'crearCuenta' ? 'crearCuenta' : 'entrar'); return; }
   if (e.target.id === 'fTienda'){ st.cp = document.getElementById('cp').value.replace(/\D/g, ''); guardar(); if (st.cp.length >= 4) buscarTiendas(); else aviso('Escribí un código postal de 4 números'); }
 });
 

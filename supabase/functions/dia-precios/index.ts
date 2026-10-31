@@ -1,7 +1,8 @@
 // dia-precios: intermediario entre la app y la web de Día (diaonline.supermercadosdia.com.ar).
 // La web de Día no deja que otra página le pida datos desde el navegador (no manda CORS),
 // así que la app le pregunta a esta función y la función le pregunta a Día.
-// Sólo LEE datos públicos (los mismos que ve cualquiera en la web, sin cuenta) y no guarda nada.
+// De Día sólo LEE datos públicos (los mismos que ve cualquiera en la web, sin cuenta).
+// En la base guarda las cuentas de la app, la lista de cada cuenta y la historia de precios (tablas pd_).
 //
 //   ?do=tiendas&cp=1766                       tiendas Día con retiro cerca de un código postal
 //   ?do=rubros                                los rubros y sub-rubros de la tienda
@@ -10,9 +11,10 @@
 //        orden: 'descuento' · 'unidad' (precio por kg/litro) · 'precio' · 'caro' · 'nombre'
 //        con modo 'rubro' y q, busca ese texto dentro del rubro
 //   POST {do:'precios', tienda, ids:[...]}    productos puntuales
-//   POST {do:'seguir', tienda, id, nombre, imagen, si}   agregar/sacar de "Mi lista" (queda en la base, se ve en PC y celular)
-//   POST {do:'seguidos', tienda}              Mi lista con el precio de hoy y la historia guardada día por día
-//   ?do=capturar                              foto diaria de todos los seguidos (la llama pg_cron a las 9 de Argentina)
+//   POST {do:'crearCuenta' | 'entrar', usuario, clave}  cuentas propias → {pase, usuario}
+//   POST {do:'seguir', tienda, pase, id, nombre, imagen, si}   agregar/sacar de "Mi lista" de esa cuenta
+//   POST {do:'seguidos', tienda, pase}            Mi lista con el precio de hoy y la historia guardada día por día
+//   ?do=capturar                              foto diaria de lo que sigue cualquier cuenta (la llama pg_cron a las 9 de Argentina)
 //
 // Todo producto se confirma en la tienda elegida con un carrito de prueba (sin comprar ni cuenta):
 // con 1 unidad sale el precio real y si hay stock para retirar; con 2 unidades, si Día aplica
@@ -315,52 +317,110 @@ async function guardarFoto(seller: string, productos: any[]) {
   });
 }
 
+/* ---------- Cuentas propias (usuario y contraseña, sin correo) ---------- */
+// La contraseña se guarda cifrada (PBKDF2); al entrar se da un pase firmado con la clave de servicio que vale un año.
+class Aviso extends Error {}   // errores para mostrar tal cual (no son de Día)
+class SinSesion extends Aviso {}   // el pase falta, no vale o venció: la app vuelve al ingreso
+const enc = new TextEncoder();
+const b64u = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const desdeB64u = (t: string) => new TextDecoder().decode(Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0)));
+async function hashClave(clave: string, sal: string) {
+  const k = await crypto.subtle.importKey("raw", enc.encode(clave), "PBKDF2", false, ["deriveBits"]);
+  return b64u(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: enc.encode(sal), iterations: 100000 }, k, 256));
+}
+let llaveFirma: CryptoKey | null = null;
+async function firmar(txt: string) {
+  llaveFirma ||= await crypto.subtle.importKey("raw", enc.encode("precios-dia:" + SB_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return b64u(await crypto.subtle.sign("HMAC", llaveFirma, enc.encode(txt)));
+}
+async function pase(id: string, usuario: string) {
+  const cuerpo = b64u(enc.encode(JSON.stringify({ u: id, n: usuario, e: Date.now() + 365 * 864e5 })));
+  return `${cuerpo}.${await firmar(cuerpo)}`;
+}
+async function cuentaDe(c: any): Promise<{ id: string; usuario: string }> {
+  const [cuerpo, f] = String(c.pase || "").split(".");
+  if (!cuerpo || !f || f !== await firmar(cuerpo)) throw new SinSesion("Entrá con tu cuenta para usar Mi lista");
+  const d = JSON.parse(desdeB64u(cuerpo));
+  if (!d.u || !(d.e > Date.now())) throw new SinSesion("Tu sesión venció: entrá de nuevo");
+  return { id: d.u, usuario: d.n };
+}
+const usuarioOk = (u: string) => /^[a-z0-9._-]{3,30}$/.test(u);
+
+async function crearCuenta(c: any) {
+  const usuario = String(c.usuario || "").trim().toLowerCase(), clave = String(c.clave || "");
+  if (!usuarioOk(usuario)) throw new Aviso("El usuario va de 3 a 30 letras o números, sin espacios");
+  if (clave.length < 6) throw new Aviso("La contraseña tiene que tener al menos 6 caracteres");
+  if ((await db(`pd_cuentas?select=id&usuario=eq.${encodeURIComponent(usuario)}`) || []).length) throw new Aviso("Ese usuario ya existe: elegí otro o entrá con él");
+  const sal = b64u(crypto.getRandomValues(new Uint8Array(16)));
+  const [cta] = await db("pd_cuentas", { method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify([{ usuario, sal, hash: await hashClave(clave, sal), ultimo_ingreso: new Date().toISOString() }]) });
+  // La lista de antes de que hubiera cuentas (una sola, compartida) pasa a la primera cuenta que se crea
+  let migrados = 0;
+  const viejos = await db("pd_seguidos?select=seller,item_id,nombre,imagen,geo,agregado") || [];
+  if (viejos.length) {
+    await db("pd_lista?on_conflict=cuenta,seller,item_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify(viejos.map((v: any) => ({ ...v, cuenta: cta.id }))) });
+    await db("pd_seguidos?seller=neq.__nada__", { method: "DELETE" });
+    migrados = viejos.length;
+  }
+  return { pase: await pase(cta.id, usuario), usuario, migrados };
+}
+async function entrar(c: any) {
+  const usuario = String(c.usuario || "").trim().toLowerCase(), clave = String(c.clave || "");
+  const [cta] = usuarioOk(usuario) ? (await db(`pd_cuentas?select=id,sal,hash&usuario=eq.${encodeURIComponent(usuario)}`) || []) : [];
+  if (!cta || await hashClave(clave, cta.sal) !== cta.hash) throw new Aviso("Usuario o contraseña incorrectos");
+  await db(`pd_cuentas?id=eq.${cta.id}`, { method: "PATCH", body: JSON.stringify({ ultimo_ingreso: new Date().toISOString() }) });
+  return { pase: await pase(cta.id, usuario), usuario };
+}
+
 async function seguir(c: any) {
+  const yo = await cuentaDe(c);
   const t = c.tienda, id = String(c.id || "");
   if (!tiendaOk(t) || !/^\d{1,12}$/.test(id)) throw new Error("Faltan datos");
   if (c.si === false) {
-    await db(`pd_seguidos?seller=eq.${t.seller}&item_id=eq.${id}`, { method: "DELETE" });   // la historia se conserva
+    await db(`pd_lista?cuenta=eq.${yo.id}&seller=eq.${t.seller}&item_id=eq.${id}`, { method: "DELETE" });   // la historia se conserva
     return { ok: true };
   }
-  const n = await db(`pd_seguidos?select=item_id&seller=eq.${t.seller}`);
-  if ((n || []).length >= 100) throw new Error("La lista ya tiene 100 productos");
-  await db("pd_seguidos?on_conflict=seller,item_id", {
+  const n = await db(`pd_lista?select=item_id&cuenta=eq.${yo.id}&seller=eq.${t.seller}`);
+  if ((n || []).length >= 100) throw new Aviso("Tu lista ya tiene 100 productos");
+  await db("pd_lista?on_conflict=cuenta,seller,item_id", {
     method: "POST", headers: { Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify([{ seller: t.seller, item_id: id, nombre: String(c.nombre || "").slice(0, 200), imagen: String(c.imagen || "").slice(0, 500), geo: t.geo }]),
+    body: JSON.stringify([{ cuenta: yo.id, seller: t.seller, item_id: id, nombre: String(c.nombre || "").slice(0, 200), imagen: String(c.imagen || "").slice(0, 500), geo: t.geo }]),
   });
   const r = await precios({ tienda: t, ids: [id] });
   await guardarFoto(t.seller, r.productos);
   return { ok: true };
 }
 
-// La lista con el precio de hoy (en vivo) y todo lo guardado día por día
+// La lista de la cuenta con el precio de hoy (en vivo) y todo lo guardado día por día (la historia es de la tienda, compartida)
 async function seguidos(c: any) {
+  const yo = await cuentaDe(c);
   const t = c.tienda;
   if (!tiendaOk(t)) throw new Error("Falta la tienda");
-  const filas = await db(`pd_seguidos?select=item_id,nombre,imagen,agregado&seller=eq.${t.seller}&order=agregado.asc`) || [];
+  const filas = await db(`pd_lista?select=item_id,nombre,imagen,agregado&cuenta=eq.${yo.id}&seller=eq.${t.seller}&order=agregado.asc`) || [];
   const ids = filas.map((f: any) => f.item_id);
-  if (!ids.length) return { hora: new Date().toISOString(), seguidos: [], productos: [], historia: {} };
+  if (!ids.length) return { hora: new Date().toISOString(), usuario: yo.usuario, seguidos: [], productos: [], historia: {} };
   const vivo = await precios({ tienda: t, ids });
   await guardarFoto(t.seller, vivo.productos).catch(() => {});
   const desde = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
   const h = await db(`pd_historia?select=fecha,item_id,precio,lista,promo_unit,promo_nombre,disponible&seller=eq.${t.seller}&fecha=gte.${desde}&item_id=in.(${ids.join(",")})&order=fecha.asc`) || [];
   const historia: Record<string, any[]> = {};
   for (const r of h) (historia[r.item_id] ||= []).push({ fecha: r.fecha, precio: Number(r.precio), lista: Number(r.lista), promo: r.promo_unit != null ? Number(r.promo_unit) : null, promoNombre: r.promo_nombre, disponible: r.disponible });
-  return { hora: vivo.hora, seguidos: filas, productos: vivo.productos, historia };
+  return { hora: vivo.hora, usuario: yo.usuario, seguidos: filas, productos: vivo.productos, historia };
 }
 
-// La tarea automática de todos los días: foto de precios de todos los productos seguidos, tienda por tienda
+// La tarea automática de todos los días: foto de precios de lo que sigue cualquier cuenta, tienda por tienda
 async function capturar() {
-  const filas = await db("pd_seguidos?select=seller,item_id,geo") || [];
-  const porTienda = new Map<string, { geo: number[]; ids: string[] }>();
+  const filas = await db("pd_lista?select=seller,item_id,geo") || [];
+  const porTienda = new Map<string, { geo: number[]; ids: Set<string> }>();
   for (const f of filas) {
-    const x = porTienda.get(f.seller) || porTienda.set(f.seller, { geo: f.geo, ids: [] }).get(f.seller)!;
-    x.ids.push(f.item_id); if (!x.geo && f.geo) x.geo = f.geo;
+    const x = porTienda.get(f.seller) || porTienda.set(f.seller, { geo: f.geo, ids: new Set() }).get(f.seller)!;
+    x.ids.add(f.item_id); if (!x.geo && f.geo) x.geo = f.geo;
   }
   const res: Record<string, number> = {};
   for (const [seller, x] of porTienda) {
     if (!Array.isArray(x.geo)) continue;
-    const r = await precios({ tienda: { seller, geo: x.geo }, ids: x.ids });
+    const r = await precios({ tienda: { seller, geo: x.geo }, ids: [...x.ids] });
     await guardarFoto(seller, r.productos);
     res[seller] = r.productos.length;
   }
@@ -380,8 +440,11 @@ Deno.serve(async (req) => {
     if (accion === "seguir") return json(await seguir(c));
     if (accion === "seguidos") return json(await seguidos(c));
     if (accion === "capturar") return json(await capturar());
+    if (accion === "crearCuenta") return json(await crearCuenta(c));
+    if (accion === "entrar") return json(await entrar(c));
     return json({ error: "Acción desconocida" }, 400);
   } catch (e) {
+    if (e instanceof Aviso) return json({ error: e.message, sesion: e instanceof SinSesion }, 400);
     return json({ error: "No se pudo consultar a Día: " + String((e as Error).message || e) }, 502);
   }
 });
