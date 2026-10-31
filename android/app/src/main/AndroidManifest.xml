@@ -21,5 +21,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Después de actualizarse con "Actualizar", la app se vuelve a abrir sola -->
+        <receiver android:name=".Reabrir" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+        </receiver>
     </application>
 </manifest>
