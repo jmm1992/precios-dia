@@ -35,6 +35,8 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);          // la página guarda la tienda, los filtros y lo último que se vio
         s.setAllowFileAccess(true);
+        // La página reconoce que es la app y muestra su versión
+        s.setUserAgentString(s.getUserAgentString() + " PreciosDiaApp/" + versionApp());
         // Los enlaces de afuera (la web de Día) se abren en el navegador; la página propia, acá
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -59,7 +61,7 @@ public class MainActivity extends Activity {
             }
         });
         if (b != null) web.restoreState(b);
-        else web.loadUrl(WEB);
+        else web.loadUrl(WEB + "?v=" + System.currentTimeMillis());   // siempre la página recién publicada, nunca la guardada
         setContentView(web);
         // ¿Hay una versión nueva de la app? (la página se actualiza sola; esto es para el ícono, el botón Atrás, etc.)
         if (b == null) new Thread(() -> Actualizacion.ofrecerSiHay(this), "ver-actualizacion").start();
@@ -88,6 +90,10 @@ public class MainActivity extends Activity {
     public void onConfigurationChanged(Configuration c) {
         super.onConfigurationChanged(c);
         pintarBarras();
+    }
+
+    private String versionApp() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return "?"; }
     }
 
     private boolean oscuro() {

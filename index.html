@@ -246,6 +246,9 @@ const pct = v => Math.round(Math.abs(v)) + '%';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
+// Versión de la página (cambiarla al publicar) y de la app de Android (la app la agrega al "user agent")
+const VERSION_PAGINA = '31/10 20:40';
+const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
 
@@ -483,7 +486,7 @@ function vCuenta(){
       <label for="cClave">Contraseña</label><input id="cClave" name="password" type="password" autocomplete="current-password" minlength="6" required>
       <div class="botones"><button class="pri" value="entrar">Entrar</button><button value="crearCuenta">Crear cuenta</button></div>
       <p class="nota" id="cMsg">${pendienteSeguir ? 'Después de entrar se agrega a tu lista: <b>' + esc(pendienteSeguir.nombre) + '</b>.' : 'Si es la primera vez, escribí el usuario y la contraseña que quieras y tocá <b>Crear cuenta</b>.'}</p>
-    </form>`;
+    </form><p class="nota" style="text-align:center;margin-top:18px">${versiones()}</p>`;
 }
 async function entrarCuenta(accion){
   const usuario = document.getElementById('cUsuario').value.trim(), clave = document.getElementById('cClave').value;
@@ -546,7 +549,7 @@ async function vLista(forzar){
         <button class="star on" data-seguir="${p.id}" title="Dejar de seguir">★</button>
       </div>`;
     }).join('');
-    R.innerHTML = `<div class="fila" style="margin-bottom:8px">${cabeceraHora(j)}</div><div class="stats">${resumen}</div>${notaSem}<div class="lsegs">${filas}</div>`;
+    R.innerHTML = `<div class="fila" style="margin-bottom:8px">${cabeceraHora(j)}</div><div class="stats">${resumen}</div>${notaSem}<div class="lsegs">${filas}</div><p class="nota" style="text-align:center;margin-top:18px">${versiones()}</p>`;
   }, cuerpoLista(), forzar);
 }
 function olvidarLista(){
@@ -561,7 +564,7 @@ async function vTienda(){
   V.innerHTML = `<h1>Elegí tu tienda</h1><p class="bajada">Ahora: <b>${esc(nombreTienda())}</b>. Buscá por código postal y tocá la tuya.</p>
     <form class="buscar" id="fTienda"><input id="cp" inputmode="numeric" placeholder="Código postal" value="${esc(st.cp)}"><button>Buscar</button></form>
     ${b.cargando ? '<div class="vacio">Buscando tiendas…</div>' : b.error ? `<div class="error">${esc(b.error)}</div>`
-      : b.lista.map((t, i) => { const on = t.seller === st.tienda.seller; return `<div class="tienda ${on ? 'on' : ''}"><div><b>${esc(nombreTienda(t))}</b><br><small>${esc(t.localidad)} · a ${String(t.distanciaKm).replace('.', ',')} km</small></div><button data-elegir="${i}">${on ? '✓ Mi tienda' : 'Elegir'}</button></div>`; }).join('')}`;
+      : (b.lista.length ? '' : `<p class="nota">${versiones()}</p>`) + b.lista.map((t, i) => { const on = t.seller === st.tienda.seller; return `<div class="tienda ${on ? 'on' : ''}"><div><b>${esc(nombreTienda(t))}</b><br><small>${esc(t.localidad)} · a ${String(t.distanciaKm).replace('.', ',')} km</small></div><button data-elegir="${i}">${on ? '✓ Mi tienda' : 'Elegir'}</button></div>`; }).join('')}`;
 }
 async function buscarTiendas(){
   busTiendas = {lista:[], cargando:true, error:''}; vTienda();
