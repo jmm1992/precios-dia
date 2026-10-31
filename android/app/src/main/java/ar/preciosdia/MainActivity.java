@@ -61,6 +61,15 @@ public class MainActivity extends Activity {
         if (b != null) web.restoreState(b);
         else web.loadUrl(WEB);
         setContentView(web);
+        // ¿Hay una versión nueva de la app? (la página se actualiza sola; esto es para el ícono, el botón Atrás, etc.)
+        if (b == null) new Thread(() -> Actualizacion.ofrecerSiHay(this), "ver-actualizacion").start();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Al salir, si hay una versión nueva se instala sola (como CamCasa)
+        new Thread(() -> Actualizacion.instalarSiHay(this), "actualizar-sola").start();
     }
 
     @Override
