@@ -90,8 +90,10 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 
 /* Tira de "llevando 2" */
 .tira{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(160px,180px);gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:16px;scrollbar-width:thin}
-.seccion{font-size:15.5px;font-weight:800;margin:6px 0 8px;display:flex;align-items:center;gap:8px}
-.seccion small{font-weight:500;color:var(--mut);font-size:12.5px}
+/* Títulos de sección: un solo renglón, con la cantidad en una burbujita (en el celular no se parten en dos) */
+.seccion{font-size:16px;font-weight:800;margin:20px 0 9px;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden}
+.seccion small{font-weight:500;color:var(--mut);font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
+.seccion .cant{font-size:12px;font-weight:700;color:var(--mut);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
 
 /* Rubros */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -212,6 +214,7 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .sinStock:not([open]) summary::after{transform:rotate(-90deg)}
 .sinStock summary small{font-weight:500}
 .sinStock .grid{padding:0 10px 12px}
+.precio s{white-space:nowrap;display:inline-block}   /* el precio tachado no se parte: si no entra, pasa entero abajo */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 @media (max-width:520px){
@@ -267,7 +270,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
 // Versión de la página (cambiarla al publicar) y de la app de Android (la app la agrega al "user agent")
-const VERSION_PAGINA = '01/11 09:30';
+const VERSION_PAGINA = '01/11 09:45';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
@@ -368,19 +371,22 @@ async function cargar(render, cuerpo, forzar){
 async function vOfertas(forzar){
   let R = []; try { R = await rubros(); } catch(e){}
   V.innerHTML = `
-    <h1>Ofertas de hoy en tu tienda</h1>
-    <p class="bajada">Los productos con más descuento sobre su precio de lista, con stock para retirar en ${esc(nombreTienda())}.</p>
+    <h1 style="margin-bottom:10px">Ofertas de hoy</h1>
     ${filaChips([{cat:'', nombre:'Todo', id:0}, ...R].map(r => `<button data-ofcat="${r.cat}" class="${st.ofCat === r.cat ? 'on' : ''}">${ICONOS[r.id] || '🛒'} ${esc(r.nombre)}</button>`).join(''))}
     <div data-resultado>${esqueleto()}</div>`;
   cargar(j => {
     const bajos = j.productos.filter(p => esMuyBajo(p) && p.disponible);
     const con2 = j.productos.filter(p => p.llevando2 && p.disponible);
-    const tira = (t, sub, l) => `<div class="seccion">${t} <small>${sub}</small></div><div class="tira">${l.map(tarjeta).join('')}</div>`;
-    V.querySelector('[data-resultado]').innerHTML = `<div class="fila" style="margin-bottom:8px">${cabeceraHora(j)}</div>`
-      + (bajos.length ? tira('🚨 Precios muy bajos', 'mucho menos de lo que valen normalmente', bajos) : '')
-      + (con2.length ? tira('🔁 Llevando 2 sale menos', 'promos confirmadas en tu tienda', con2) : '')
-      + (bajos.length || con2.length ? '<div class="seccion">🏷️ Mayor descuento</div>' : '')
-      + grilla(j.productos);
+    const titulo = (t, n, ayuda) => `<div class="seccion" title="${ayuda}">${t} <span class="cant">${n}</span></div>`;
+    const tira = (t, l, ayuda) => titulo(t, l.length, ayuda) + `<div class="tira">${l.map(tarjeta).join('')}</div>`;
+    const yaArriba = new Set(bajos.map(p => p.id));   // los de "Precios muy bajos" no se repiten abajo
+    const resto = j.productos.filter(p => !yaArriba.has(p.id));
+    const conStock = resto.filter(p => p.disponible).length;
+    V.querySelector('[data-resultado]').innerHTML = `<div class="fila" style="margin-bottom:2px">${cabeceraHora(j)}</div>`
+      + (bajos.length ? tira('🚨 Precios muy bajos', bajos, 'Mucho menos de lo que valen normalmente') : '')
+      + (con2.length ? tira('🔁 Llevando 2 sale menos', con2, 'Promos confirmadas en tu tienda') : '')
+      + titulo('🏷️ Mayor descuento', conStock, 'Ordenados por descuento sobre el precio de lista')
+      + grilla(resto);
   }, {do:'listar', modo:'ofertas', cat:st.ofCat, orden:'descuento', tienda:tiendaParam()}, forzar);
 }
 
