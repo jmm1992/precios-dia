@@ -93,19 +93,43 @@ public class MainActivity extends Activity {
      * 3) si no está instalada, devuelve false y se abre la web.
      */
     private boolean abrirEnAppDia(Uri u) {
-        Intent ver = new Intent(Intent.ACTION_VIEW, u).setPackage(APP_DIA);
-        if (ver.resolveActivity(getPackageManager()) != null) {
-            try { startActivity(ver); return true; } catch (Exception ignored) { }
+        // No se sabe qué enlaces acepta la app de Día (no se pudo leer su configuración): se prueban, en orden,
+        // las formas conocidas de producto y de búsqueda, y se usa la primera que ella diga que abre.
+        String nombre = nombreDelEnlace(u), q = Uri.encode(nombre), id = idDelEnlace(u);
+        String base = "https://diaonline.supermercadosdia.com.ar/";
+        String[] candidatos = {
+            u.toString(),                                   // el producto, tal cual
+            base + q + "?_q=" + q + "&map=ft",              // la búsqueda de la web de Día
+            base + "busca?ft=" + q,
+            base + "search?q=" + q,
+            "diaonline://product/" + id, "diaonline://search?q=" + q,
+            "dia://product/" + id, "dia://search?q=" + q,
+            "supermercadosdia://product/" + id, "supermercadosdia://search?q=" + q,
+        };
+        for (String c : candidatos) {
+            if (c.contains("//product/") && id.isEmpty()) continue;
+            Intent ver = new Intent(Intent.ACTION_VIEW, Uri.parse(c)).setPackage(APP_DIA).addCategory(Intent.CATEGORY_BROWSABLE);
+            if (ver.resolveActivity(getPackageManager()) != null) {
+                try { startActivity(ver); return true; } catch (Exception ignored) { }
+            }
         }
+        // Ninguno: se abre la app de Día con el nombre del producto copiado para pegarlo en su buscador
         Intent app = getPackageManager().getLaunchIntentForPackage(APP_DIA);
         if (app == null) return false;
-        String nombre = nombreDelEnlace(u);
         if (!nombre.isEmpty()) {
             android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("Producto", nombre));
             android.widget.Toast.makeText(this, "Copiado: «" + nombre + "». Pegalo en el buscador de la app de Día", android.widget.Toast.LENGTH_LONG).show();
         }
         try { startActivity(app); return true; } catch (Exception e) { return false; }
+    }
+
+    /** "/yerba-mate-playadito-suave-500-gr-269578/p" → "269578" (vacío si no hay número al final) */
+    static String idDelEnlace(Uri u) {
+        String s = "";
+        for (String p : u.getPathSegments()) if (!"p".equals(p)) s = p;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("-(\\d+)$").matcher(s);
+        return m.find() ? m.group(1) : "";
     }
 
     /** "/yerba-mate-playadito-suave-500-gr-269578/p" → "yerba mate playadito suave 500 gr" */
