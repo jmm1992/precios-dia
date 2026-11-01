@@ -205,6 +205,13 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 #hojaAct h2{text-align:center;margin:8px 0 4px}
 #hojaAct .explica{text-align:center}
 #actEstado{text-align:center;min-height:1em}
+.sinStock{margin-top:18px;background:var(--card);border:1px dashed var(--line);border-radius:14px;overflow:hidden}
+.sinStock summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:700;font-size:14px;color:var(--mut);display:flex;align-items:center;gap:8px}
+.sinStock summary::-webkit-details-marker{display:none}
+.sinStock summary::after{content:"▾";margin-left:auto;transition:transform .15s}
+.sinStock:not([open]) summary::after{transform:rotate(-90deg)}
+.sinStock summary small{font-weight:500}
+.sinStock .grid{padding:0 10px 12px}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 @media (max-width:520px){
@@ -260,7 +267,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
 // Versión de la página (cambiarla al publicar) y de la app de Android (la app la agrega al "user agent")
-const VERSION_PAGINA = '01/11 09:00';
+const VERSION_PAGINA = '01/11 09:30';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
@@ -317,13 +324,11 @@ function tarjeta(p){
 }
 const esqueleto = (n = 8) => `<div class="grid esqueleto">${Array.from({length:n}, () => `<div class="pc"><div class="foto"></div><div class="info"><div class="lin" style="width:90%"></div><div class="lin" style="width:60%"></div><div class="lin" style="width:40%;height:18px"></div></div></div>`).join('')}</div>`;
 
+// Los que no tienen stock en la tienda van aparte, al final, en un bloque que se abre tocándolo (y se acuerda si quedó abierto)
+const bloqueSinStock = sin => !sin.length ? '' : `<details class="sinStock"${st.verSinStock ? ' open' : ''}><summary>Sin stock en tu tienda <small>${sin.length} ${sin.length === 1 ? 'producto' : 'productos'}</small></summary><div class="grid">${sin.map(tarjeta).join('')}</div></details>`;
 function grilla(productos){
-  const visibles = st.soloStock ? productos.filter(p => p.disponible) : productos;
-  const ocultos = productos.length - visibles.length;
-  let h = visibles.length ? `<div class="grid">${visibles.map(tarjeta).join('')}</div>` : `<div class="vacio">No hay productos con stock en tu tienda para mostrar acá.</div>`;
-  if (ocultos) h += `<p class="nota">${ocultos} ${ocultos === 1 ? 'producto no tiene' : 'productos no tienen'} stock en tu tienda y no se muestran. <button data-accion="verSin">Mostrarlos igual</button></p>`;
-  else if (!st.soloStock) h += `<p class="nota"><button data-accion="verSin">Ocultar los que no tienen stock</button></p>`;
-  return h;
+  const con = productos.filter(p => p.disponible), sin = productos.filter(p => !p.disponible);
+  return (con.length ? `<div class="grid">${con.map(tarjeta).join('')}</div>` : `<div class="vacio">No hay productos con stock en tu tienda para mostrar acá.</div>`) + bloqueSinStock(sin);
 }
 function cabeceraHora(j){ return `<span class="hora">Precios de las ${horaCorta(j.hora)}<button data-accion="refrescar">↻ Actualizar</button></span>`; }
 
@@ -399,13 +404,16 @@ function renderOrdenado(j){
   if (st.orden !== 'unidad') return h + grilla(j.productos);
   const grupos = new Map();
   for (const p of j.productos){ const k = p.porUnidad ? (p.subsub || p.subrubro || 'Otros') : 'Sin precio por kilo o litro'; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); }
+  const sinTodos = [];   // los sin stock de todos los grupos, juntos al final
   for (const [k, ps] of grupos){
     const conStock = ps.filter(p => p.disponible && p.porUnidad);
     if (conStock.length >= 2) conStock[0].primeroGrupo = true;
-    if (st.soloStock && !ps.some(p => p.disponible)) continue;
-    h += `<div class="seccion" style="margin-top:14px">${esc(k)} <small>${ps.length} productos</small></div>` + grilla(ps);
+    const con = ps.filter(p => p.disponible);
+    sinTodos.push(...ps.filter(p => !p.disponible));
+    if (!con.length) continue;
+    h += `<div class="seccion" style="margin-top:14px">${esc(k)} <small>${con.length} ${con.length === 1 ? 'producto' : 'productos'}</small></div><div class="grid">${con.map(tarjeta).join('')}</div>`;
   }
-  return h;
+  return h + bloqueSinStock(sinTodos);
 }
 
 async function vRubros(forzar){
@@ -734,7 +742,11 @@ V.addEventListener('click', e => {
   const pc = t.closest('.pc[data-id], .lseg[data-id]'); if (pc && enPantalla.has(pc.dataset.id)) abrirDetalle(enPantalla.get(pc.dataset.id));
 });
 // Las secciones de un rubro quedan abiertas o cerradas como las dejó (también al volver a dibujar la pantalla)
-V.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('secciones')){ st.secCerradas = !e.target.open; guardar(); } }, true);
+V.addEventListener('toggle', e => {
+  if (!e.target.classList) return;
+  if (e.target.classList.contains('secciones')){ st.secCerradas = !e.target.open; guardar(); }
+  if (e.target.classList.contains('sinStock')){ st.verSinStock = e.target.open; guardar(); }
+}, true);
 V.addEventListener('change', e => { if (e.target.id === 'selOrden'){ st.orden = e.target.value; guardar(); dibujar(); } });
 V.addEventListener('submit', e => {
   e.preventDefault();
