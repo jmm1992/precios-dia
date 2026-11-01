@@ -88,6 +88,7 @@ final class Actualizacion {
                 }
                 String accion = a.getPackageName() + ".INSTALADO";
                 if (!sola) {
+                    a.getSharedPreferences("preciosdia", Context.MODE_PRIVATE).edit().putLong(Reabrir.MARCA, System.currentTimeMillis()).commit();
                     // A mano ("Actualizar"): el resultado va directo a la pantalla de la app. Así, cuando la versión
                     // nueva queda instalada, el instalador de Android la vuelve a abrir (Android no deja que una app
                     // se abra sola desde atrás). Si Android pide confirmar, lo maneja MainActivity.resultadoInstalacion.

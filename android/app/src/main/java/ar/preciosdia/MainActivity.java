@@ -135,6 +135,15 @@ public class MainActivity extends Activity {
 
     /** "Actualizar" en el cartel de la página: pide el permiso si falta (y sigue al volver) o baja e instala. */
     private void empezarActualizacion() {
+        // Para el aviso "se actualizó · tocá para abrir" Android pide (una sola vez) permiso de notificaciones
+        android.content.SharedPreferences sp = getSharedPreferences("preciosdia", MODE_PRIVATE);
+        if (android.os.Build.VERSION.SDK_INT >= 33 && !sp.getBoolean("pidioAvisos", false)
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            sp.edit().putBoolean("pidioAvisos", true).apply();
+            estado("Permití los avisos: así, cuando termine, te avisa para abrirla");
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7);
+            return;
+        }
         if (!getPackageManager().canRequestPackageInstalls()) {
             esperandoPermiso = true;
             estado("Activá «Permitir desde esta fuente» y volvé: la actualización sigue sola");
@@ -150,6 +159,12 @@ public class MainActivity extends Activity {
     void estado(String texto) {
         String js = "window.estadoActualizacion && estadoActualizacion(" + org.json.JSONObject.quote(texto) + ")";
         runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int pedido, String[] permisos, int[] resultados) {
+        super.onRequestPermissionsResult(pedido, permisos, resultados);
+        if (pedido == 7) empezarActualizacion();   // con o sin permiso, la actualización sigue
     }
 
     @Override
