@@ -58,6 +58,12 @@ public class MainActivity extends Activity {
                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
                 return true;
             }
+            // Si la app ya sabe que hay una versión nueva cuando la página termina de cargar, se lo dice
+            // (la página no le pregunta: esa pregunta, hecha mientras cargaba, la dejaba en negro)
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                if (hayNueva) v.evaluateJavascript("window.avisoActualizacion && avisoActualizacion()", null);
+            }
             // Si la publicada no se puede abrir (sin internet, GitHub caído), se usa la copia de adentro
             @Override
             public void onReceivedError(WebView v, WebResourceRequest r, android.webkit.WebResourceError e) {
