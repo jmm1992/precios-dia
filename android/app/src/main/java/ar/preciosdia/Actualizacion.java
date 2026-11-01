@@ -67,6 +67,23 @@ final class Actualizacion {
         } catch (Exception e) { Log.w(TAG, "actualización sola: " + e); }
     }
 
+    /**
+     * "Actualizar" (a mano): la versión nueva pasa por el instalador de Android, que muestra "¿Actualizar esta app?"
+     * y al terminar "App actualizada" con el botón ABRIR (como CamCasa; pedido del dueño 01/11/2026: "que se mande
+     * el cartel abrir directamente, sin notificaciones"). La instalación silenciosa de sesiones no muestra esa pantalla.
+     */
+    static void conPantallaDeAndroid(Activity a, HttpURLConnection c) throws Exception {
+        java.io.File f = Archivos.apk(a);
+        try (InputStream in = c.getInputStream(); OutputStream out = new java.io.FileOutputStream(f)) {
+            byte[] b = new byte[64 * 1024]; int r;
+            while ((r = in.read(b)) > 0) out.write(b, 0, r);
+        }
+        Intent i = new Intent(Intent.ACTION_VIEW).setDataAndType(Archivos.APK, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (a instanceof MainActivity) ((MainActivity) a).estado("Tocá «Actualizar» y después «Abrir»");
+        a.runOnUiThread(() -> { try { a.startActivity(i); } catch (Exception e) { Log.w(TAG, "instalador: " + e); } });
+    }
+
     /** Baja la app nueva y la instala. Bloquea: fuera del hilo de la pantalla. */
     static void instalar(Activity a, boolean sola) {
         HttpURLConnection c = null;
@@ -74,6 +91,7 @@ final class Actualizacion {
             c = (HttpURLConnection) new URL(APK + "?t=" + System.currentTimeMillis()).openConnection();
             c.setConnectTimeout(8000); c.setReadTimeout(30000); c.setUseCaches(false);
             if (c.getResponseCode() != 200) { if (!sola && a instanceof MainActivity) ((MainActivity) a).estado("No se pudo bajar la actualización: probá más tarde"); return; }
+            if (!sola) { conPantallaDeAndroid(a, c); return; }
             PackageInstaller pi = a.getPackageManager().getPackageInstaller();
             PackageInstaller.SessionParams sp = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
             sp.setAppPackageName(a.getPackageName());
@@ -87,17 +105,6 @@ final class Actualizacion {
                     s.fsync(out);
                 }
                 String accion = a.getPackageName() + ".INSTALADO";
-                if (!sola) {
-                    a.getSharedPreferences("preciosdia", Context.MODE_PRIVATE).edit().putLong(Reabrir.MARCA, System.currentTimeMillis()).commit();
-                    // A mano ("Actualizar"): el resultado va directo a la pantalla de la app. Así, cuando la versión
-                    // nueva queda instalada, el instalador de Android la vuelve a abrir (Android no deja que una app
-                    // se abra sola desde atrás). Si Android pide confirmar, lo maneja MainActivity.resultadoInstalacion.
-                    Intent abrir = new Intent(a, MainActivity.class).setAction(accion)
-                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                    PendingIntent pa = PendingIntent.getActivity(a, id, abrir, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
-                    s.commit(pa.getIntentSender());
-                    return;
-                }
                 BroadcastReceiver rec = new BroadcastReceiver() {
                     @Override public void onReceive(Context ctx, Intent i) {
                         int st = i.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
