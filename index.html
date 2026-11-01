@@ -260,7 +260,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const horaCorta = iso => new Date(iso).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', month:'long'});
 // Versión de la página (cambiarla al publicar) y de la app de Android (la app la agrega al "user agent")
-const VERSION_PAGINA = '31/10 21:15';
+const VERSION_PAGINA = '01/11 09:00';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
@@ -777,7 +777,7 @@ document.getElementById('veloAct').addEventListener('click', e => {
   if (e.target.id === 'veloAct' || (b && b.dataset.act === 'despues')) return document.getElementById('veloAct').classList.remove('on');
   if (b && b.dataset.act === 'si' && window.AppPD){ b.textContent = 'Actualizando…'; AppPD.actualizar(); }
 });
-if (window.AppPD && AppPD.hayNueva()) avisoActualizacion();
+// (No se le pregunta a la app al arrancar: esa pregunta trababa la página y quedaba en negro. La app avisa sola llamando a avisoActualizacion.)
 dibujar();
 </script>
 </body>
