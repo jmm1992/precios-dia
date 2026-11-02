@@ -39,6 +39,27 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         pintarBarras();
+        armarWeb();
+        setContentView(web);
+        resultadoInstalacion(getIntent());
+        // ¿Hay una versión nueva de la app? (la página se actualiza sola; esto es para el ícono, el botón Atrás, etc.)
+        new Thread(() -> {
+            if (Actualizacion.publicada() > Actualizacion.miVersion(this)) {
+                hayNueva = true;
+                runOnUiThread(() -> web.evaluateJavascript("window.avisoActualizacion && avisoActualizacion()", null));
+            }
+        }, "ver-actualizacion").start();
+    }
+
+    private volatile boolean termino = false;   // la página terminó de cargar
+    private final android.os.Handler reloj = new android.os.Handler(android.os.Looper.getMainLooper());
+
+    /**
+     * La pantalla. Se puede rehacer: si el motor de la página se cae (pasa en celulares con poca memoria)
+     * la WebView vieja queda muerta y en negro, y la única salida es una nueva.
+     */
+    @SuppressLint("SetJavaScriptEnabled")
+    private void armarWeb() {
         web = new WebView(this);
         web.setBackgroundColor(oscuro() ? Color.parseColor("#0F1218") : Color.parseColor("#F4F5F8"));
         WebSettings s = web.getSettings();
@@ -63,6 +84,7 @@ public class MainActivity extends Activity {
             // (la página no le pregunta: esa pregunta, hecha mientras cargaba, la dejaba en negro)
             @Override
             public void onPageFinished(WebView v, String url) {
+                termino = true;
                 if (hayNueva) v.evaluateJavascript("window.avisoActualizacion && avisoActualizacion()", null);
             }
             // Si la publicada no se puede abrir (sin internet, GitHub caído), se usa la copia de adentro
@@ -74,18 +96,30 @@ public class MainActivity extends Activity {
             public void onReceivedHttpError(WebView v, WebResourceRequest r, android.webkit.WebResourceResponse e) {
                 if (r.isForMainFrame() && r.getUrl().toString().startsWith(WEB)) v.loadUrl(COPIA);
             }
-        });
-        if (b != null) web.restoreState(b);
-        else web.loadUrl(WEB + "?v=" + System.currentTimeMillis());   // siempre la página recién publicada, nunca la guardada
-        setContentView(web);
-        resultadoInstalacion(getIntent());
-        // ¿Hay una versión nueva de la app? (la página se actualiza sola; esto es para el ícono, el botón Atrás, etc.)
-        if (b == null) new Thread(() -> {
-            if (Actualizacion.publicada() > Actualizacion.miVersion(this)) {
-                hayNueva = true;
-                runOnUiThread(() -> web.evaluateJavascript("window.avisoActualizacion && avisoActualizacion()", null));
+            // El motor de la página se cayó: la WebView queda en negro para siempre. Se arma otra y se carga de nuevo.
+            @Override
+            public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                if (v != web) return true;
+                android.view.ViewGroup padre = (android.view.ViewGroup) v.getParent();
+                if (padre != null) padre.removeView(v);
+                v.destroy();
+                armarWeb();
+                setContentView(web);
+                return true;
             }
-        }, "ver-actualizacion").start();
+        });
+        cargar();
+    }
+
+    /**
+     * Siempre la página recién publicada, nunca una restaurada: al volver después de que Android cerró la app
+     * por detrás, "restaurar" la página la dejaba en negro. Si GitHub tarda sin dar error, a los 15 s va la copia.
+     */
+    private void cargar() {
+        termino = false;
+        web.loadUrl(WEB + "?v=" + System.currentTimeMillis());
+        final WebView esta = web;
+        reloj.postDelayed(() -> { if (!termino && web == esta) web.loadUrl(COPIA); }, 15000);
     }
 
     /**
@@ -182,6 +216,16 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (esperandoPermiso && getPackageManager().canRequestPackageInstalls()) { esperandoPermiso = false; empezarActualizacion(); }
+        // Al volver: si la página quedó vacía (o no contesta en 3 s), se carga de nuevo
+        if (web != null && termino) {
+            final boolean[] contesto = {false};
+            final WebView esta = web;
+            web.evaluateJavascript("(document.body && document.body.children.length > 0) ? 1 : 0", v -> {
+                contesto[0] = true;
+                if (!"1".equals(v) && web == esta) cargar();
+            });
+            reloj.postDelayed(() -> { if (!contesto[0] && web == esta) cargar(); }, 3000);
+        }
     }
 
     @Override
@@ -194,7 +238,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle b) {
         super.onSaveInstanceState(b);
-        if (web != null) web.saveState(b);
     }
 
     /** Atrás: primero cierra lo que esté abierto en la página (detalle, rubro...); si no hay nada, sale. */
