@@ -41,6 +41,7 @@ public class MainActivity extends Activity {
         pintarBarras();
         armarWeb();
         setContentView(web);
+        buscarCambios();
         resultadoInstalacion(getIntent());
         // ¿Hay una versión nueva de la app? (la página se actualiza sola; esto es para el ícono, el botón Atrás, etc.)
         new Thread(() -> {
@@ -87,15 +88,6 @@ public class MainActivity extends Activity {
                 termino = true;
                 if (hayNueva) v.evaluateJavascript("window.avisoActualizacion && avisoActualizacion()", null);
             }
-            // Si la publicada no se puede abrir (sin internet, GitHub caído), se usa la copia de adentro
-            @Override
-            public void onReceivedError(WebView v, WebResourceRequest r, android.webkit.WebResourceError e) {
-                if (r.isForMainFrame() && r.getUrl().toString().startsWith(WEB)) v.loadUrl(COPIA);
-            }
-            @Override
-            public void onReceivedHttpError(WebView v, WebResourceRequest r, android.webkit.WebResourceResponse e) {
-                if (r.isForMainFrame() && r.getUrl().toString().startsWith(WEB)) v.loadUrl(COPIA);
-            }
             // El motor de la página se cayó: la WebView queda en negro para siempre. Se arma otra y se carga de nuevo.
             @Override
             public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
@@ -112,14 +104,23 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Siempre la página recién publicada, nunca una restaurada: al volver después de que Android cerró la app
-     * por detrás, "restaurar" la página la dejaba en negro. Si GitHub tarda sin dar error, a los 15 s va la copia.
+     * AL INSTANTE (él, 02/11/2026: "abrís la app y queda en negro y empieza a los segundos"): se muestra la página
+     * guardada en el celular (o la de adentro de la app) sin esperar a internet. La dirección de base es la de
+     * GitHub Pages, así la página sigue guardando lo suyo (tienda, sesión, filtros) en el mismo lugar que antes.
+     * Nunca se restaura la página vieja de Android (la dejaba en negro: 1.13).
      */
     private void cargar() {
         termino = false;
-        web.loadUrl(WEB + "?v=" + System.currentTimeMillis());
-        final WebView esta = web;
-        reloj.postDelayed(() -> { if (!termino && web == esta) web.loadUrl(COPIA); }, 15000);
+        String html = Pagina.guardada(this);
+        if (html == null) html = Pagina.deAdentro(this);
+        web.loadDataWithBaseURL(WEB, html, "text/html", "UTF-8", null);
+    }
+
+    /** Baja la página publicada; si cambió, la muestra (también al volver a la app, que quedó abierta). */
+    private void buscarCambios() {
+        new Thread(() -> {
+            if (Pagina.bajar(this)) runOnUiThread(() -> { if (web != null) cargar(); });
+        }, "pagina-nueva").start();
     }
 
     /**
@@ -216,6 +217,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (esperandoPermiso && getPackageManager().canRequestPackageInstalls()) { esperandoPermiso = false; empezarActualizacion(); }
+        if (web != null && termino) buscarCambios();   // volver a la app (que quedó abierta) también trae lo nuevo
         // Al volver: si la página quedó vacía (o no contesta en 3 s), se carga de nuevo
         if (web != null && termino) {
             final boolean[] contesto = {false};

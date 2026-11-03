@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La ventana nace del color de fondo de la página: así no se ve negro mientras arranca -->
+<resources>
+    <style name="Tema" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/fondo</item>
+        <item name="android:statusBarColor">#FFFFFFFF</item>
+        <item name="android:navigationBarColor">@color/fondo</item>
+    </style>
+    <color name="fondo">#FFF4F5F8</color>
+</resources>
