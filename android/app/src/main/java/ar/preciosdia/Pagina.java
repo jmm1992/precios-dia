@@ -19,7 +19,11 @@ import java.nio.charset.StandardCharsets;
 final class Pagina {
     private Pagina() { }
 
-    private static File archivo(Context c) { return new File(c.getFilesDir(), "pagina.html"); }
+    /** Una por versión de la app: al actualizarse, la guardada (más vieja) no le gana a la que trae adentro. */
+    private static File archivo(Context c) {
+        long v; try { v = Actualizacion.miVersion(c); } catch (Exception e) { v = 0; }
+        return new File(c.getFilesDir(), "pagina-" + v + ".html");
+    }
 
     /** La última página bajada, o null si todavía no hay. */
     static String guardada(Context c) {
