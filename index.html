@@ -126,9 +126,12 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 11px;display:flex;align-items:baseline;gap:7px}
 .stat b{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stat span{font-size:12px;color:var(--mut);line-height:1.25}
-.stat.statPromo{background:var(--verde2);border-color:transparent}
+.stat{min-width:0}.stat > span{min-width:0}
+.stat.statPromo{grid-column:1/-1;flex-wrap:wrap;row-gap:2px;background:var(--verde2);border-color:transparent;align-items:center}
 .stat.statPromo b{color:var(--verde)}
-.stat.statPromo span{color:var(--ink, inherit)}
+.stat.statPromo span{color:var(--ink);font-size:13px}
+.stat span b.din{font-size:inherit;color:var(--verde);white-space:nowrap}
+.stat .nw{white-space:nowrap}
 .lsegs{display:flex;flex-direction:column;gap:8px}
 .lseg{display:grid;grid-template-columns:56px minmax(0,1fr) 140px auto 36px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;position:relative}
 .lseg:hover{border-color:var(--mut)}
@@ -569,14 +572,14 @@ async function vLista(forzar){
       const ult = sem.map(x => ({p:x.p, a:x.s[x.s.length - 1], b:x.s[x.s.length - 2]}));
       const baj = ult.filter(x => x.a.precio < x.b.precio).length, sub = ult.filter(x => x.a.precio > x.b.precio).length;
       const tA = ult.reduce((s, x) => s + x.a.precio, 0), tB = ult.reduce((s, x) => s + x.b.precio, 0);
-      resumen += `<div class="stat"><b class="${tA < tB ? 'baja' : tA > tB ? 'sube' : ''}">${tA === tB ? '=' : (tA < tB ? '▼ ' : '▲ ') + pct(variacion(tA, tB))}</b><span>tu lista esta semana contra la anterior (${plata(Math.round(tA))} vs ${plata(Math.round(tB))})</span></div>
+      resumen += `<div class="stat"><b class="${tA < tB ? 'baja' : tA > tB ? 'sube' : ''}">${tA === tB ? '=' : (tA < tB ? '▼ ' : '▲ ') + pct(variacion(tA, tB))}</b><span>tu lista esta semana contra la anterior (<span class="nw">${plata(Math.round(tA))}</span> vs <span class="nw">${plata(Math.round(tB))}</span>)</span></div>
         <div class="stat"><b><span class="baja">▼${baj}</span> <span class="sube">▲${sub}</span></b><span>bajaron y subieron esta semana</span></div>`;
     } else notaSem = '';
     // Las promos de "llevando N" de hoy, con lo que se ahorra llevando la cantidad de cada una
     const enPromo = ps.filter(p => p.llevando2 && p.disponible);
     if (enPromo.length){
       const ahorro = enPromo.reduce((s, p) => s + (p.precio - p.llevando2) * (p.promoCant || 2), 0);
-      resumen += `<div class="stat statPromo"><b>${enPromo.length} con promo</b><span>hoy · llevando la cantidad de cada promo ahorrás ${plata(Math.round(ahorro))}</span></div>`;
+      resumen += `<div class="stat statPromo"><b>${enPromo.length} con promo hoy</b><span>ahorrás <b class="din">${plata(Math.round(ahorro))}</b> llevando lo que pide cada promo</span></div>`;
     }
     if (!sem.length) notaSem = `<p class="nota">📅 La comparación semana a semana aparece cuando haya dos semanas guardadas: a partir del ${proximoLunes()}.</p>`;
     // ----- un renglón por producto, con su traza -----
