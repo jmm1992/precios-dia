@@ -126,6 +126,9 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 11px;display:flex;align-items:baseline;gap:7px}
 .stat b{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stat span{font-size:12px;color:var(--mut);line-height:1.25}
+.stat.statPromo{background:var(--verde2);border-color:transparent}
+.stat.statPromo b{color:var(--verde)}
+.stat.statPromo span{color:var(--ink, inherit)}
 .lsegs{display:flex;flex-direction:column;gap:8px}
 .lseg{display:grid;grid-template-columns:56px minmax(0,1fr) 140px auto 36px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;position:relative}
 .lseg:hover{border-color:var(--mut)}
@@ -479,7 +482,10 @@ function traza(h, w = 130, alto = 38){
   const v = h.map(r => r.precio), mn = Math.min(...v), mx = Math.max(...v), r = mx - mn || 1;
   const X = i => 3 + i / (v.length - 1) * (w - 6), Y = x => alto - 4 - (x - mn) / r * (alto - 8);
   const color = v[v.length - 1] < v[0] ? 'var(--verde)' : v[v.length - 1] > v[0] ? 'var(--rojo)' : 'var(--mut)';
-  return `<svg class="traza" viewBox="0 0 ${w} ${alto}" width="${w}" height="${alto}" aria-hidden="true"><polyline points="${v.map((x, i) => X(i) + ',' + Y(x)).join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/><circle cx="${X(v.length - 1)}" cy="${Y(v[v.length - 1])}" r="3" fill="${color}"/></svg>`;
+  // puntos verdes: los días que tuvo promo de "llevando N" (la línea sigue siendo el precio de una unidad)
+  const conPromo = h.map((x, i) => x.promo != null ? `<circle cx="${X(i)}" cy="${Y(v[i])}" r="3.2" fill="var(--verde)" stroke="var(--card)" stroke-width="1.2"/>` : '').join('');
+  const ultPromo = h[h.length - 1].promo != null;
+  return `<svg class="traza" viewBox="0 0 ${w} ${alto}" width="${w}" height="${alto}" aria-hidden="true"><polyline points="${v.map((x, i) => X(i) + ',' + Y(x)).join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>${ultPromo ? '' : `<circle cx="${X(v.length - 1)}" cy="${Y(v[v.length - 1])}" r="3" fill="${color}"/>`}${conPromo}</svg>`;
 }
 function graficoHist(h){
   if (h.length < 2) return '';
@@ -499,8 +505,13 @@ function graficoHist(h){
 function tablaSemanas(h){
   const s = porSemana(h);
   if (s.length < 2) return '';
-  return `<table class="tabla"><thead><tr><th>Semana del</th><th class="n">Precio</th><th class="n">Contra la anterior</th></tr></thead><tbody>
-    ${s.map((r, i) => `<tr><td>${fLargaD(r.lunes)}${r.promoNombre ? ` <span class="mini-promo">${esc(r.promoNombre)}</span>` : ''}</td><td class="n">${plata(r.precio)}</td><td class="n">${i ? flechaTxt(variacion(r.precio, s[i - 1].precio)) : '—'}</td></tr>`).reverse().join('')}
+  // "Llevando N": lo que sale cada una aprovechando la promo. La flecha sigue comparando el precio de una unidad:
+  // si comparara con la promo, cada vez que empieza o termina un 2x1 parecería que el precio cambió a la mitad.
+  const hayPromo = s.some(r => r.promo != null);
+  const cant = n => { const m = /^\s*(\d+)\s*x/i.exec(n || '') || /^\s*(\d+)\s*(do|da|ro|ra|to|ta)\b/i.exec(n || ''); return m ? Number(m[1]) : 2; };
+  const nMax = Math.max(2, ...s.filter(r => r.promo != null).map(r => cant(r.promoNombre)));
+  return `<table class="tabla"><thead><tr><th>Semana del</th><th class="n">Precio</th>${hayPromo ? `<th class="n">Llevando ${nMax}</th>` : ''}<th class="n">Contra la anterior</th></tr></thead><tbody>
+    ${s.map((r, i) => `<tr><td>${fLargaD(r.lunes)}${r.promoNombre ? ` <span class="mini-promo">${esc(r.promoNombre)}</span>` : ''}</td><td class="n">${plata(r.precio)}</td>${hayPromo ? `<td class="n">${r.promo != null ? `<span class="baja">${plata(r.promo)}</span>` : '<span class="igual">—</span>'}</td>` : ''}<td class="n">${i ? flechaTxt(variacion(r.precio, s[i - 1].precio)) : '—'}</td></tr>`).reverse().join('')}
   </tbody></table>`;
 }
 const proximoLunes = () => { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'numeric'}); };
@@ -560,7 +571,14 @@ async function vLista(forzar){
       const tA = ult.reduce((s, x) => s + x.a.precio, 0), tB = ult.reduce((s, x) => s + x.b.precio, 0);
       resumen += `<div class="stat"><b class="${tA < tB ? 'baja' : tA > tB ? 'sube' : ''}">${tA === tB ? '=' : (tA < tB ? '▼ ' : '▲ ') + pct(variacion(tA, tB))}</b><span>tu lista esta semana contra la anterior (${plata(Math.round(tA))} vs ${plata(Math.round(tB))})</span></div>
         <div class="stat"><b><span class="baja">▼${baj}</span> <span class="sube">▲${sub}</span></b><span>bajaron y subieron esta semana</span></div>`;
-    } else notaSem = `<p class="nota">📅 La comparación semana a semana aparece cuando haya dos semanas guardadas: a partir del ${proximoLunes()}.</p>`;
+    } else notaSem = '';
+    // Las promos de "llevando N" de hoy, con lo que se ahorra llevando la cantidad de cada una
+    const enPromo = ps.filter(p => p.llevando2 && p.disponible);
+    if (enPromo.length){
+      const ahorro = enPromo.reduce((s, p) => s + (p.precio - p.llevando2) * (p.promoCant || 2), 0);
+      resumen += `<div class="stat statPromo"><b>${enPromo.length} con promo</b><span>hoy · llevando la cantidad de cada promo ahorrás ${plata(Math.round(ahorro))}</span></div>`;
+    }
+    if (!sem.length) notaSem = `<p class="nota">📅 La comparación semana a semana aparece cuando haya dos semanas guardadas: a partir del ${proximoLunes()}.</p>`;
     // ----- un renglón por producto, con su traza -----
     const filas = ps.slice().sort((a, b) => {
       const ca = a.h.length ? variacion(a.precio, a.h[0].precio) : 0, cb = b.h.length ? variacion(b.precio, b.h[0].precio) : 0;
@@ -572,7 +590,7 @@ async function vLista(forzar){
       return `<div class="lseg" data-id="${p.id}">
         <img src="${esc(p.imagen)}" alt="" loading="lazy">
         <div class="lnom"><b>${esc(p.nombre)}</b>
-          <div class="ltags">${p.disponible ? '' : '<span class="flag rojo">Sin stock en tu tienda</span>'}${p.llevando2 ? `<span class="flag verde">${esc(p.promoNombre || 'Promo')}: ${plata(p.llevando2)} c/u</span>` : ''}${p.descuento >= 1 ? `<span class="flag rojo">−${pct(p.descuento)}</span>` : ''}</div>
+          <div class="ltags">${p.disponible ? '' : '<span class="flag rojo">Sin stock en tu tienda</span>'}${p.llevando2 ? `<span class="flag verde">${esc(p.promoNombre || 'Promo')} · ${plata(p.llevando2)} c/u llevando ${p.promoCant || 2}</span>` : ''}${p.descuento >= 1 ? `<span class="flag rojo">−${pct(p.descuento)}</span>` : ''}</div>
           <div class="ldesde">${ini ? (Math.abs(desde) < .05 ? `= Igual que el ${fLargaD(ini.fecha)}` : `${flechaTxt(desde)} desde el ${fLargaD(ini.fecha)} (${plata(ini.precio)})`) : ''}</div></div>
         <div class="ltraza">${traza(p.h)}</div>
         <div class="lprecio"><b>${plata(p.precio)}</b>${sem != null ? `<small>semana: ${flechaTxt(sem)}</small>` : ''}</div>
