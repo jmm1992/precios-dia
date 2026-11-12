@@ -680,7 +680,7 @@ function abrirDetalle(p){
 }
 
 /* ---------- Compartir un producto como imagen (con foto, precio, promo, por kilo y tienda) ---------- */
-let detalleP = null, compFormato = 'alta', compCanvas = null;
+let detalleP = null, compFormato = st.compFormato || 'chat', compCanvas = null;   // 'chat' (horizontal, entra entera en WhatsApp) o 'alta'
 const COMP_OPC = [['promo', 'Promo llevando 2'], ['lista', 'Precio de lista tachado'], ['unid', 'Precio por unidad'], ['kilo', 'Precio por kilo'], ['tienda', 'Tienda y fecha']];
 function compTiene(p, k){ return k === 'promo' ? !!p.llevando2 : k === 'lista' ? p.lista > p.precio : k === 'kilo' ? !!p.porUnidad : k === 'unid' ? !!unidadesDelNombre(p.nombre) : true; }
 function compOpc(){ st.compOpc = st.compOpc || {promo:true, lista:true, kilo:true, tienda:true}; if (st.compOpc.unid === undefined) st.compOpc.unid = true; return st.compOpc; }
@@ -712,7 +712,78 @@ function compRenglones(ctx, txt, ancho, max){
   if (r.length > max){ r.length = max; r[max - 1] = r[max - 1].replace(/\s*\S*$/, '') + '…'; }
   return r;
 }
+// "Para chat": tarjeta horizontal (foto a la izquierda, datos a la derecha), así WhatsApp la muestra ENTERA en el chat
+// sin tener que abrirla (las imágenes altas las recorta en la burbuja).
+async function compArmarChat(p){
+  const o = compOpc(), K = 3, W = 400 * K, F = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const usa = k => compTiene(p, k) && o[k];
+  const foto = await compFoto(p.imagen);
+  const c = document.createElement('canvas'), ctx = c.getContext('2d');
+  const X = 168 * K, AN = W - X - 16 * K, n = p.promoCant || 2;
+  // medidas de la columna de datos
+  ctx.font = `600 ${15 * K}px ${F}`; const nom = compRenglones(ctx, p.nombre, AN, 3);
+  ctx.font = `800 ${30 * K}px ${F}`; const pt = plata(p.precio), ptw = ctx.measureText(pt).width;
+  ctx.font = `${13 * K}px ${F}`; const lt = usa('lista') ? plata(p.lista) : '', ltw = lt ? ctx.measureText(lt).width : 0;
+  const listaAbajo = lt && ptw + 10 * K + ltw > AN;
+  const promo = usa('promo') ? `${p.promoNombre ? p.promoNombre + ' · ' : ''}llevando ${n}: ${plata(p.llevando2)} c/u` : '';
+  ctx.font = `700 ${12.5 * K}px ${F}`; const promoR = promo ? compRenglones(ctx, promo, AN - 16 * K, 2) : [];
+  const nu = unidadesDelNombre(p.nombre);
+  const unid = usa('unid') ? `${plataR((usa('promo') ? p.llevando2 : p.precio) / nu)} cada unidad (${nu})${usa('promo') ? ' con la promo' : ''}` : '';
+  const kilo = usa('kilo') ? `${plataR(p.porUnidad2 && usa('promo') ? p.porUnidad2 : p.porUnidad)} ${porQue(p.unidad)}${p.porUnidad2 && usa('promo') ? ' con la promo' : ''}` : '';
+  let th = nom.length * 19 * K + 8 * K + 30 * K + (listaAbajo ? 18 * K : 0);
+  if (promoR.length) th += 10 * K + promoR.length * 17 * K + 12 * K;
+  if (unid) th += 20 * K;
+  if (kilo) th += 18 * K;
+  const top = 44 * K, cuerpo = Math.max(156 * K, th + 28 * K), pie = usa('tienda') ? 40 * K : 0;
+  c.width = W; c.height = Math.round(top + cuerpo + pie);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, c.height);
+  // barra de arriba
+  const g = ctx.createLinearGradient(14 * K, 10 * K, 38 * K, 34 * K); g.addColorStop(0, '#ff5a5f'); g.addColorStop(1, '#e30613');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(14 * K, 10 * K, 24 * K, 24 * K, 7 * K); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = `800 ${13 * K}px ${F}`; ctx.textAlign = 'center'; ctx.fillText('$', 26 * K, 27 * K);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#171b26'; ctx.font = `700 ${14 * K}px ${F}`; ctx.fillText('Precios Día', 45 * K, 27 * K);
+  if (usa('tienda')){ ctx.textAlign = 'right'; ctx.fillStyle = '#6b7385'; ctx.font = `${11.5 * K}px ${F}`; ctx.fillText(new Date().toLocaleDateString('es-AR'), W - 14 * K, 27 * K); ctx.textAlign = 'left'; }
+  ctx.fillStyle = '#eef0f4'; ctx.fillRect(0, top - 2, W, 2);
+  // la foto, a la izquierda y centrada en su alto
+  const caja = 140 * K, fx = 14 * K, fy = top + (cuerpo - caja) / 2;
+  if (foto){ const e = Math.min(caja / foto.naturalWidth, caja / foto.naturalHeight), fw = foto.naturalWidth * e, fh = foto.naturalHeight * e; ctx.drawImage(foto, fx + (caja - fw) / 2, fy + (caja - fh) / 2, fw, fh); }
+  else { ctx.fillStyle = '#9aa3b5'; ctx.font = `${13 * K}px ${F}`; ctx.textAlign = 'center'; ctx.fillText('Sin foto', fx + caja / 2, fy + caja / 2); ctx.textAlign = 'left'; }
+  if (usa('lista')){
+    const t = '−' + pct(p.descuento || (1 - p.precio / p.lista) * 100); ctx.font = `800 ${13 * K}px ${F}`;
+    const bw = ctx.measureText(t).width + 16 * K;
+    ctx.fillStyle = '#e30613'; ctx.beginPath(); ctx.roundRect(10 * K, top + 10 * K, bw, 24 * K, 8 * K); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(t, 18 * K, top + 27 * K);
+  }
+  // los datos, a la derecha y centrados en su alto
+  let y = top + (cuerpo - th) / 2;
+  ctx.fillStyle = '#171b26'; ctx.font = `600 ${15 * K}px ${F}`;
+  nom.forEach(l => { y += 16 * K; ctx.fillText(l, X, y); y += 3 * K; });
+  y += 8 * K + 28 * K; ctx.fillStyle = '#e30613'; ctx.font = `800 ${30 * K}px ${F}`; ctx.fillText(pt, X, y);
+  if (lt){
+    const lx = listaAbajo ? X : X + ptw + 10 * K; if (listaAbajo) y += 18 * K;
+    ctx.fillStyle = '#8a91a1'; ctx.font = `${13 * K}px ${F}`; ctx.fillText(lt, lx, y); ctx.fillRect(lx, y - 4.5 * K, ltw, 1.5 * K);
+  }
+  y += 2 * K;
+  if (promoR.length){
+    y += 10 * K; const ph = promoR.length * 17 * K + 12 * K;
+    ctx.fillStyle = '#e3f6ea'; ctx.beginPath(); ctx.roundRect(X, y, AN, ph, 9 * K); ctx.fill();
+    ctx.fillStyle = '#0d6b30'; ctx.font = `700 ${12.5 * K}px ${F}`;
+    promoR.forEach((l, i) => ctx.fillText(l, X + 8 * K, y + 6 * K + 13 * K + i * 17 * K));
+    y += ph;
+  }
+  if (unid){ y += 19 * K; ctx.fillStyle = '#171b26'; ctx.font = `600 ${13 * K}px ${F}`; ctx.fillText(compRenglones(ctx, unid, AN, 1)[0], X, y); }
+  if (kilo){ y += 18 * K; ctx.fillStyle = '#6b7385'; ctx.font = `${12 * K}px ${F}`; ctx.fillText(kilo, X, y); }
+  // pie: la tienda
+  if (pie){
+    const py = top + cuerpo;
+    ctx.fillStyle = '#fafbfc'; ctx.fillRect(0, py, W, pie); ctx.fillStyle = '#eef0f4'; ctx.fillRect(0, py, W, 2);
+    ctx.fillStyle = '#6b7385'; ctx.font = `${11.5 * K}px ${F}`;
+    ctx.fillText(compRenglones(ctx, nombreTienda() + ' · precio online, en góndola puede variar', W - 28 * K, 1)[0], 14 * K, py + 25 * K);
+  }
+  return c;
+}
 async function compArmar(p){
+  if (compFormato === 'chat') return compArmarChat(p);
   const o = compOpc(), K = 3, W = 340 * K, F = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
   const usa = k => compTiene(p, k) && o[k];
   const fotoH = (compFormato === 'alta' ? 340 : 212) * K;
@@ -908,7 +979,7 @@ document.getElementById('velo').addEventListener('click', e => {
   const s = e.target.closest('[data-seguir]'); if (s) seguir(s.dataset.seguir);
   if (e.target.closest('[data-compartir]')) abrirCompartir();
   const cf = e.target.closest('[data-compformato]');
-  if (cf){ compFormato = cf.dataset.compformato; document.querySelectorAll('[data-compformato]').forEach(b => b.classList.toggle('on', b === cf)); compDibujar(); }
+  if (cf){ compFormato = st.compFormato = cf.dataset.compformato; guardar(); document.querySelectorAll('[data-compformato]').forEach(b => b.classList.toggle('on', b === cf)); compDibujar(); }
   const ce = e.target.closest('[data-compenviar]'); if (ce) compEnviar(ce.dataset.compenviar);
 });
 document.getElementById('velo').addEventListener('change', e => {
