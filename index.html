@@ -296,6 +296,13 @@ const VERSION_PAGINA = '01/11 09:45';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
 const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
+// Cuántas unidades trae el paquete, leído del nombre: "3 X 120 Gr." → 3, "80mts 4 Ud." → 4. Sin eso, 0.
+function unidadesDelNombre(nombre){
+  const t = String(nombre || '');
+  const m = t.match(/(?:^|\s)(\d{1,3})\s*[xX]\s*\d/) || t.match(/(?:^|\s|x)(\d{1,3})\s*(?:u|ud|uds|un|unid|unidades)(?:\.|\s|$)/i);
+  const n = m ? +m[1] : 0;
+  return n >= 2 && n <= 200 ? n : 0;
+}
 
 /* ---------- Conexión (con memoria de 10 minutos) ---------- */
 const memo = new Map();
@@ -649,6 +656,8 @@ function abrirDetalle(p){
   const n = p.promoCant || 2;
   if (p.llevando2) r.push([`Promo ${esc(p.promoNombre || '')}`, `llevando ${n}: ${plata(p.llevando2)} c/u · ${plata(p.llevando2 * n)} en total (ahorrás ${plata((p.precio - p.llevando2) * n)})`]);
   if (p.porUnidad) r.push([`Precio por ${p.unidad === 'kg' ? 'kilo' : 'litro'}`, plataR(p.porUnidad) + (p.porUnidad2 ? ` (${plataR(p.porUnidad2)} con la promo)` : '')]);
+  const nu = unidadesDelNombre(p.nombre);
+  if (nu) r.push(['Precio por unidad', `${plataR(p.precio / nu)} c/u (${nu} unidades)` + (p.llevando2 ? ` · ${plataR(p.llevando2 / nu)} con la promo` : '')]);
   r.push(['Stock en tu tienda', p.disponible ? '✓ Hay para retirar' : '✗ No hay']);
   const h = HIST[p.id] || [];
   if (h.length) r.push(['Primer precio guardado', `${plata(h[0].precio)} (${fLargaD(h[0].fecha)}) · ${Math.abs(variacion(p.precio, h[0].precio)) < .05 ? 'igual' : flechaTxt(variacion(p.precio, h[0].precio))}`]);
@@ -672,9 +681,9 @@ function abrirDetalle(p){
 
 /* ---------- Compartir un producto como imagen (con foto, precio, promo, por kilo y tienda) ---------- */
 let detalleP = null, compFormato = 'alta', compCanvas = null;
-const COMP_OPC = [['promo', 'Promo llevando 2'], ['lista', 'Precio de lista tachado'], ['kilo', 'Precio por kilo'], ['tienda', 'Tienda y fecha']];
-function compTiene(p, k){ return k === 'promo' ? !!p.llevando2 : k === 'lista' ? p.lista > p.precio : k === 'kilo' ? !!p.porUnidad : true; }
-function compOpc(){ st.compOpc = st.compOpc || {promo:true, lista:true, kilo:true, tienda:true}; return st.compOpc; }
+const COMP_OPC = [['promo', 'Promo llevando 2'], ['lista', 'Precio de lista tachado'], ['unid', 'Precio por unidad'], ['kilo', 'Precio por kilo'], ['tienda', 'Tienda y fecha']];
+function compTiene(p, k){ return k === 'promo' ? !!p.llevando2 : k === 'lista' ? p.lista > p.precio : k === 'kilo' ? !!p.porUnidad : k === 'unid' ? !!unidadesDelNombre(p.nombre) : true; }
+function compOpc(){ st.compOpc = st.compOpc || {promo:true, lista:true, kilo:true, tienda:true}; if (st.compOpc.unid === undefined) st.compOpc.unid = true; return st.compOpc; }
 function abrirCompartir(){
   const panel = document.getElementById('compPanel'), p = detalleP;
   if (!panel || !p) return;
@@ -718,6 +727,7 @@ async function compArmar(p){
   const promoR = promo ? compRenglones(ctx, promo, W - 52 * K, 2) : [];
   let h = 50 * K + fotoH + 14 * K + nom.length * 21 * K + 8 * K + 38 * K;
   if (promoR.length) h += 10 * K + promoR.length * 19 * K + 14 * K;
+  if (usa('unid')) h += 24 * K;
   if (usa('kilo')) h += 24 * K;
   h += 16 * K;
   if (usa('tienda')) h += 52 * K;
@@ -764,6 +774,7 @@ async function compArmar(p){
     promoR.forEach((l, i) => ctx.fillText(l, 26 * K, y + 7 * K + 15 * K + i * 19 * K));
     y += ph;
   }
+  if (usa('unid')){ const nu = unidadesDelNombre(p.nombre), pr = usa('promo') ? p.llevando2 : p.precio; y += 20 * K; ctx.fillStyle = '#171b26'; ctx.font = `600 ${14 * K}px ${F}`; ctx.fillText(`${plataR(pr / nu)} cada unidad (${nu} en el paquete)${usa('promo') ? ' con la promo' : ''}`, 16 * K, y); y += 4 * K; }
   if (usa('kilo')){ y += 20 * K; ctx.fillStyle = '#6b7385'; ctx.font = `${13 * K}px ${F}`; ctx.fillText(`${plataR(p.porUnidad2 && usa('promo') ? p.porUnidad2 : p.porUnidad)} ${porQue(p.unidad)}${p.porUnidad2 && usa('promo') ? ' con la promo' : ''}`, 16 * K, y); y += 4 * K; }
   y += 16 * K;
   // pie: la tienda

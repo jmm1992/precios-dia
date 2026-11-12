@@ -240,6 +240,13 @@ public class MainActivity extends Activity {
         super.onResume();
         if (esperandoPermiso && getPackageManager().canRequestPackageInstalls()) { esperandoPermiso = false; empezarActualizacion(); }
         if (web != null && termino) buscarCambios();   // volver a la app (que quedó abierta) también trae lo nuevo
+        // Volver a la app también se fija si hay una versión nueva, para mostrar el cartel "Actualizar"
+        if (web != null && termino && !hayNueva && !aMano) new Thread(() -> {
+            if (Actualizacion.publicada() > Actualizacion.miVersion(this)) {
+                hayNueva = true;
+                runOnUiThread(() -> web.evaluateJavascript("window.avisoActualizacion && avisoActualizacion()", null));
+            }
+        }, "ver-actualizacion").start();
         // Al volver: si la página quedó vacía (o no contesta en 3 s), se carga de nuevo
         if (web != null && termino) {
             final boolean[] contesto = {false};
@@ -252,12 +259,8 @@ public class MainActivity extends Activity {
         }
     }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
-        // Al salir, si hay una versión nueva se instala sola (como CamCasa)
-        if (!aMano) new Thread(() -> Actualizacion.instalarSiHay(this), "actualizar-sola").start();
-    }
+    // Ya NO se instala sola al salir (1.17): cualquier cosa que tape la app (el menú de compartir, WhatsApp) contaba
+    // como "salir" y la app se cerraba sin decir nada. Ahora siempre es el cartel "Actualizar" → instalador → Abrir.
 
     @Override
     protected void onSaveInstanceState(Bundle b) {
