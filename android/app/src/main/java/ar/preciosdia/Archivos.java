@@ -26,19 +26,31 @@ public class Archivos extends ContentProvider {
         return new File(d, "precios-dia.apk");
     }
 
+    // También la imagen de un producto que se comparte (cache/compartir/precio.jpg), con el mismo cuidado: sólo leer.
+    static final Uri IMAGEN = Uri.parse("content://" + AUTORIDAD + "/precio.jpg");
+
+    static File imagen(android.content.Context c) {
+        File d = new File(c.getCacheDir(), "compartir");
+        d.mkdirs();
+        return new File(d, "precio.jpg");
+    }
+
+    private boolean esImagen(Uri uri) { return "precio.jpg".equals(uri.getLastPathSegment()); }
+    private File archivo(Uri uri) { return esImagen(uri) ? imagen(getContext()) : apk(getContext()); }
+
     @Override public boolean onCreate() { return true; }
 
     @Override
     public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
-        return ParcelFileDescriptor.open(apk(getContext()), ParcelFileDescriptor.MODE_READ_ONLY);
+        return ParcelFileDescriptor.open(archivo(uri), ParcelFileDescriptor.MODE_READ_ONLY);
     }
 
-    @Override public String getType(Uri uri) { return "application/vnd.android.package-archive"; }
+    @Override public String getType(Uri uri) { return esImagen(uri) ? "image/jpeg" : "application/vnd.android.package-archive"; }
 
     @Override
     public Cursor query(Uri uri, String[] p, String s, String[] a, String o) {
         MatrixCursor c = new MatrixCursor(new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE});
-        c.addRow(new Object[]{"precios-dia.apk", apk(getContext()).length()});
+        c.addRow(new Object[]{uri.getLastPathSegment(), archivo(uri).length()});
         return c;
     }
 

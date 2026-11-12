@@ -175,6 +175,11 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .buscar{display:flex;gap:8px;margin-bottom:10px}
 .buscar input{flex:1;font:inherit;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
 .buscar button{border:0;background:var(--dia);color:#fff;border-radius:12px;padding:0 18px;font-weight:700}
+/* La X para borrar lo escrito de una: sólo aparece con algo escrito */
+.buscar .conX{flex:1;position:relative;display:flex;min-width:0}
+.buscar .conX input{padding-right:42px;min-width:0}
+.buscar .borrarX{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;padding:0;border-radius:50%;background:var(--soft);color:var(--mut);font-size:14px;font-weight:700;display:grid;place-items:center}
+.buscar .conX input:placeholder-shown + .borrarX{display:none}
 .tienda{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:8px}
 .tienda small{color:var(--mut)}
 .tienda button{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 14px;font-weight:700}
@@ -196,6 +201,17 @@ h1{font-size:21px;margin:4px 0 2px;letter-spacing:-.3px}
 .botones{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .botones a,.botones button{flex:1 1 160px;text-align:center;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px;font-weight:700;color:var(--ink);text-decoration:none}
 .botones .pri{background:var(--dia);color:#fff;border-color:var(--dia)}
+.botones .wa{background:#25d366;color:#08331a;border-color:#25d366}
+/* Compartir como imagen */
+#compPanel{margin-top:14px;border-top:1px solid var(--line);padding-top:4px}
+.compOpc{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.compOpc label{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13.5px;background:var(--soft);cursor:pointer;user-select:none}
+.compOpc input{width:17px;height:17px;margin:0;accent-color:var(--dia)}
+.compFormato{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:2px 0 10px}
+.compFormato button{border:0;background:none;padding:7px 14px;font-size:13.5px;color:var(--mut)}
+.compFormato button.on{background:var(--ink);color:var(--bg);font-weight:700}
+.compVista{display:flex;justify-content:center;background:var(--soft);border-radius:14px;padding:14px;min-height:120px;align-items:center}
+.compVista img{width:100%;max-width:300px;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .cuenta{max-width:420px;margin:6px auto 0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 16px}
 .cuenta label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
 .cuenta input{width:100%;box-sizing:border-box;font:inherit;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg, var(--card));color:var(--ink)}
@@ -406,7 +422,7 @@ const EXPLICA = {
 };
 // Buscador (opcional) + "Ordenar por"
 function controles(buscador){
-  return `<div class="ctrlbar">${buscador ? `<form class="buscar" id="${buscador.id}"><input id="${buscador.id}Q" placeholder="${esc(buscador.ph)}" value="${esc(buscador.valor)}" autocomplete="off" enterkeyhint="search"><button>${buscador.boton || 'Buscar'}</button></form>` : ''}
+  return `<div class="ctrlbar">${buscador ? `<form class="buscar" id="${buscador.id}"><span class="conX"><input id="${buscador.id}Q" placeholder="${esc(buscador.ph)}" value="${esc(buscador.valor)}" autocomplete="off" enterkeyhint="search"><button type="button" class="borrarX" data-accion="borrarBusq" aria-label="Borrar la búsqueda" title="Borrar la búsqueda">✕</button></span><button>${buscador.boton || 'Buscar'}</button></form>` : ''}
     <label class="ordenSel">Ordenar por <select id="selOrden">${ORDENES.map(([k, t]) => `<option value="${k}" ${st.orden === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>`;
 }
 
@@ -648,8 +664,145 @@ function abrirDetalle(p){
     ${seg ? (h.length >= 2 ? `<h3 class="subt">Cómo vino su precio</h3>${graficoHist(h)}${tablaSemanas(h) || `<p class="explica">La tabla semana a semana aparece cuando haya dos semanas guardadas.</p>`}`
       : `<p class="explica">📅 Su precio se guarda solo todos los días a las 9. Desde mañana se empieza a ver la traza de cómo sube o baja.</p>`) : ''}
     <p class="explica">Precio y stock de la web de Día para retiro en ${esc(nombreTienda())}. En la góndola puede variar.</p>
-    <div class="botones"><button class="${seg ? '' : 'pri'}" data-seguir="${p.id}">${seg ? '★ Dejar de seguir' : '☆ Seguir su precio'}</button>${p.link ? linkDia(p.link) : ''}</div>`;
+    <div class="botones"><button class="${seg ? '' : 'pri'}" data-seguir="${p.id}">${seg ? '★ Dejar de seguir' : '☆ Seguir su precio'}</button><button data-compartir>📤 Compartir</button>${p.link ? linkDia(p.link) : ''}</div>
+    <div id="compPanel" hidden></div>`;
+  detalleP = p;
   document.getElementById('velo').classList.add('on');
+}
+
+/* ---------- Compartir un producto como imagen (con foto, precio, promo, por kilo y tienda) ---------- */
+let detalleP = null, compFormato = 'alta', compCanvas = null;
+const COMP_OPC = [['promo', 'Promo llevando 2'], ['lista', 'Precio de lista tachado'], ['kilo', 'Precio por kilo'], ['tienda', 'Tienda y fecha']];
+function compTiene(p, k){ return k === 'promo' ? !!p.llevando2 : k === 'lista' ? p.lista > p.precio : k === 'kilo' ? !!p.porUnidad : true; }
+function compOpc(){ st.compOpc = st.compOpc || {promo:true, lista:true, kilo:true, tienda:true}; return st.compOpc; }
+function abrirCompartir(){
+  const panel = document.getElementById('compPanel'), p = detalleP;
+  if (!panel || !p) return;
+  if (!panel.hidden){ panel.hidden = true; return; }
+  const o = compOpc();
+  panel.innerHTML = `<h3 class="subt">Compartir como imagen</h3>
+    <div class="compOpc">${COMP_OPC.filter(([k]) => compTiene(p, k)).map(([k, t]) => `<label><input type="checkbox" data-compopc="${k}" ${o[k] ? 'checked' : ''}> ${t}</label>`).join('')}</div>
+    <div class="compFormato"><button data-compformato="alta" class="${compFormato === 'alta' ? 'on' : ''}">Para estado / historia</button><button data-compformato="chat" class="${compFormato === 'chat' ? 'on' : ''}">Para chat</button></div>
+    <div class="compVista"><span class="nota">Armando la imagen…</span></div>
+    <div class="botones"><button class="wa" data-compenviar="wa">WhatsApp</button><button class="pri" data-compenviar="otra">Compartir…</button></div>`;
+  panel.hidden = false;
+  compDibujar();
+  setTimeout(() => panel.scrollIntoView({behavior:'smooth', block:'nearest'}), 50);
+}
+const compImgs = new Map();   // las fotos ya bajadas (para no volver a pedirlas al tocar una opción)
+function compFoto(url){
+  if (!url) return Promise.resolve(null);
+  if (!compImgs.has(url)) compImgs.set(url, new Promise(res => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = url; }));
+  return compImgs.get(url);
+}
+// Parte un texto en renglones que entren en el ancho
+function compRenglones(ctx, txt, ancho, max){
+  const pal = String(txt).split(/\s+/), r = []; let l = '';
+  for (const w of pal){ const t = l ? l + ' ' + w : w; if (ctx.measureText(t).width <= ancho || !l) l = t; else { r.push(l); l = w; } }
+  if (l) r.push(l);
+  if (r.length > max){ r.length = max; r[max - 1] = r[max - 1].replace(/\s*\S*$/, '') + '…'; }
+  return r;
+}
+async function compArmar(p){
+  const o = compOpc(), K = 3, W = 340 * K, F = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const usa = k => compTiene(p, k) && o[k];
+  const fotoH = (compFormato === 'alta' ? 340 : 212) * K;
+  const foto = await compFoto(p.imagen);
+  const c = document.createElement('canvas'), ctx = c.getContext('2d');
+  // primero se mide el alto (el nombre puede ocupar 1 a 3 renglones)
+  ctx.font = `600 ${16 * K}px ${F}`;
+  const nom = compRenglones(ctx, p.nombre, W - 32 * K, 3);
+  const n = p.promoCant || 2;
+  const promo = usa('promo') ? `${p.promoNombre ? p.promoNombre + ' · ' : ''}llevando ${n}: ${plata(p.llevando2)} c/u` : '';
+  ctx.font = `700 ${14 * K}px ${F}`;
+  const promoR = promo ? compRenglones(ctx, promo, W - 52 * K, 2) : [];
+  let h = 50 * K + fotoH + 14 * K + nom.length * 21 * K + 8 * K + 38 * K;
+  if (promoR.length) h += 10 * K + promoR.length * 19 * K + 14 * K;
+  if (usa('kilo')) h += 24 * K;
+  h += 16 * K;
+  if (usa('tienda')) h += 52 * K;
+  c.width = W; c.height = Math.round(h);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, c.height);
+  ctx.textBaseline = 'alphabetic';
+  // barra de arriba: el logo de la app
+  const g = ctx.createLinearGradient(14 * K, 12 * K, 40 * K, 38 * K); g.addColorStop(0, '#ff5a5f'); g.addColorStop(1, '#e30613');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(14 * K, 12 * K, 26 * K, 26 * K, 8 * K); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = `800 ${14 * K}px ${F}`; ctx.textAlign = 'center'; ctx.fillText('$', 27 * K, 30 * K);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#171b26'; ctx.font = `700 ${14.5 * K}px ${F}`; ctx.fillText('Precios Día', 48 * K, 30 * K);
+  if (usa('tienda')){ ctx.textAlign = 'right'; ctx.fillStyle = '#6b7385'; ctx.font = `${11.5 * K}px ${F}`; ctx.fillText(new Date().toLocaleDateString('es-AR'), W - 14 * K, 30 * K); ctx.textAlign = 'left'; }
+  ctx.fillStyle = '#eef0f4'; ctx.fillRect(0, 50 * K - 2, W, 2);
+  // la foto, entera y centrada en su recuadro
+  let y = 50 * K;
+  if (foto){
+    const caja = 0.82, mw = W * caja, mh = fotoH * caja, e = Math.min(mw / foto.naturalWidth, mh / foto.naturalHeight);
+    const fw = foto.naturalWidth * e, fh = foto.naturalHeight * e;
+    ctx.drawImage(foto, (W - fw) / 2, y + (fotoH - fh) / 2, fw, fh);
+  } else { ctx.fillStyle = '#9aa3b5'; ctx.font = `${13 * K}px ${F}`; ctx.textAlign = 'center'; ctx.fillText('Sin foto', W / 2, y + fotoH / 2); ctx.textAlign = 'left'; }
+  if (usa('lista')){
+    const t = '−' + pct(p.descuento || (1 - p.precio / p.lista) * 100); ctx.font = `800 ${15 * K}px ${F}`;
+    const bw = ctx.measureText(t).width + 20 * K;
+    ctx.fillStyle = '#e30613'; ctx.beginPath(); ctx.roundRect(12 * K, y + 12 * K, bw, 28 * K, 10 * K); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(t, 22 * K, y + 32 * K);
+  }
+  y += fotoH + 14 * K;
+  // nombre
+  ctx.fillStyle = '#171b26'; ctx.font = `600 ${16 * K}px ${F}`;
+  nom.forEach(l => { y += 18 * K; ctx.fillText(l, 16 * K, y); y += 3 * K; });
+  y += 8 * K;
+  // precio grande y el de lista tachado
+  y += 34 * K; ctx.fillStyle = '#e30613'; ctx.font = `800 ${34 * K}px ${F}`; const pt = plata(p.precio); ctx.fillText(pt, 16 * K, y);
+  if (usa('lista')){
+    const x = 16 * K + ctx.measureText(pt).width + 12 * K; ctx.fillStyle = '#8a91a1'; ctx.font = `${15 * K}px ${F}`; const lt = plata(p.lista); ctx.fillText(lt, x, y);
+    const lw = ctx.measureText(lt).width; ctx.fillRect(x, y - 5 * K, lw, 1.5 * K);
+  }
+  y += 4 * K;
+  // promo
+  if (promoR.length){
+    y += 10 * K; const ph = promoR.length * 19 * K + 14 * K;
+    ctx.fillStyle = '#e3f6ea'; ctx.beginPath(); ctx.roundRect(16 * K, y, W - 32 * K, ph, 10 * K); ctx.fill();
+    ctx.fillStyle = '#0d6b30'; ctx.font = `700 ${14 * K}px ${F}`;
+    promoR.forEach((l, i) => ctx.fillText(l, 26 * K, y + 7 * K + 15 * K + i * 19 * K));
+    y += ph;
+  }
+  if (usa('kilo')){ y += 20 * K; ctx.fillStyle = '#6b7385'; ctx.font = `${13 * K}px ${F}`; ctx.fillText(`${plataR(p.porUnidad2 && usa('promo') ? p.porUnidad2 : p.porUnidad)} ${porQue(p.unidad)}${p.porUnidad2 && usa('promo') ? ' con la promo' : ''}`, 16 * K, y); y += 4 * K; }
+  y += 16 * K;
+  // pie: la tienda
+  if (usa('tienda')){
+    ctx.fillStyle = '#fafbfc'; ctx.fillRect(0, y, W, c.height - y); ctx.fillStyle = '#eef0f4'; ctx.fillRect(0, y, W, 2);
+    ctx.fillStyle = '#6b7385'; ctx.font = `${11.5 * K}px ${F}`;
+    ctx.fillText(compRenglones(ctx, nombreTienda(), W - 32 * K, 1)[0], 16 * K, y + 20 * K);
+    ctx.fillText('Precio online · en góndola puede variar', 16 * K, y + 38 * K);
+  }
+  return c;
+}
+async function compDibujar(){
+  const p = detalleP, vista = document.querySelector('#compPanel .compVista');
+  if (!p || !vista) return;
+  const c = await compArmar(p);
+  if (detalleP !== p) return;
+  compCanvas = c;
+  let url = '';
+  try { url = c.toDataURL('image/jpeg', 0.92); } catch(e){ /* la foto no dejó dibujarse: se rearma sin ella */ compImgs.set(p.imagen, Promise.resolve(null)); return compDibujar(); }
+  vista.innerHTML = `<img src="${url}" alt="Imagen para compartir">`;
+}
+function compTexto(p){
+  const n = p.promoCant || 2;
+  return `${p.nombre}: ${plata(p.precio)}${p.llevando2 && compOpc().promo ? ` (llevando ${n}: ${plata(p.llevando2)} c/u)` : ''} en ${nombreTienda()}`;
+}
+async function compEnviar(destino){
+  const p = detalleP, c = compCanvas;
+  if (!p || !c) return aviso('Esperá que se arme la imagen');
+  const texto = compTexto(p), b64 = c.toDataURL('image/jpeg', 0.92);
+  // en la app: la app de Android la pasa al menú de compartir (o directo a WhatsApp)
+  if (window.AppPD && typeof AppPD.compartir === 'function'){ AppPD.compartir(b64.split(',')[1], texto, destino === 'wa' ? 'com.whatsapp' : ''); return; }
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+  const file = new File([blob], 'precio.jpg', {type:'image/jpeg'});
+  if (navigator.canShare && navigator.canShare({files:[file]})){ try { await navigator.share({files:[file], text:texto}); } catch(e){} return; }
+  if (/PreciosDiaApp/.test(navigator.userAgent)) return aviso('Para compartir imágenes hace falta actualizar la app');
+  // computadora: se baja la imagen
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Precio ' + p.nombre.replace(/[\\/:*?"<>|]/g, '').slice(0, 60) + '.jpg';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  aviso('Imagen descargada');
 }
 // "Ver en Día": en un celular Android abre la app Día Online si está instalada (ahí está la sesión y la tienda);
 // si no, la web. Dentro de nuestra app (WebView, "; wv)") lo resuelve el lado Android; en el navegador, el enlace intent:// de Chrome.
@@ -742,6 +895,14 @@ document.getElementById('btnTienda').onclick = () => { ir('tienda'); if (!busTie
 document.getElementById('velo').addEventListener('click', e => {
   if (e.target.id === 'velo' || e.target.closest('[data-cerrar]')) return cerrarDetalle();
   const s = e.target.closest('[data-seguir]'); if (s) seguir(s.dataset.seguir);
+  if (e.target.closest('[data-compartir]')) abrirCompartir();
+  const cf = e.target.closest('[data-compformato]');
+  if (cf){ compFormato = cf.dataset.compformato; document.querySelectorAll('[data-compformato]').forEach(b => b.classList.toggle('on', b === cf)); compDibujar(); }
+  const ce = e.target.closest('[data-compenviar]'); if (ce) compEnviar(ce.dataset.compenviar);
+});
+document.getElementById('velo').addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.compopc;
+  if (k){ compOpc()[k] = e.target.checked; guardar(); compDibujar(); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarDetalle(); });
 
@@ -755,6 +916,12 @@ V.addEventListener('click', e => {
     if (k === 'refrescar') dibujar(true);
     else if (k === 'verSin'){ st.soloStock = !st.soloStock; guardar(); dibujar(); }
     else if (k === 'limpiarRubQ'){ st.rubQ = ''; guardar(); dibujar(); }
+    else if (k === 'borrarBusq'){ const f = a.closest('form'), i = f && f.querySelector('input');
+      if (i) i.value = '';
+      const aplicada = (f.id === 'fBuscar' && st.q) || (f.id === 'fRubro' && st.rubQ);
+      if (f.id === 'fBuscar') st.q = ''; if (f.id === 'fRubro') st.rubQ = '';
+      if (aplicada){ guardar(); dibujar(); }
+      const ni = document.getElementById(f.id + 'Q'); if (ni) ni.focus(); }
     else if (k === 'verClave'){ const i = document.getElementById('cClave'), ver = i.type === 'password';
       i.type = ver ? 'text' : 'password'; a.innerHTML = ver ? OJO_NO : OJO; a.classList.toggle('on', ver);
       a.setAttribute('aria-label', ver ? 'Ocultar la contraseña' : 'Mostrar la contraseña'); a.title = a.getAttribute('aria-label'); i.focus(); }

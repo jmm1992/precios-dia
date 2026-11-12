@@ -32,6 +32,28 @@ public class MainActivity extends Activity {
     class Puente {
         @JavascriptInterface public boolean hayNueva() { return hayNueva; }
         @JavascriptInterface public void actualizar() { runOnUiThread(() -> empezarActualizacion()); }
+        /** La imagen de un producto armada por la página (JPEG en base64): se guarda y va al menú de compartir de Android. */
+        @JavascriptInterface public void compartir(String b64, String texto, String paquete) {
+            try {
+                byte[] d = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                try (java.io.FileOutputStream o = new java.io.FileOutputStream(Archivos.imagen(MainActivity.this))) { o.write(d); }
+            } catch (Exception e) {
+                runOnUiThread(() -> web.evaluateJavascript("aviso('No se pudo preparar la imagen')", null));
+                return;
+            }
+            runOnUiThread(() -> {
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType("image/jpeg");
+                i.putExtra(Intent.EXTRA_STREAM, Archivos.IMAGEN);
+                if (texto != null && !texto.isEmpty()) i.putExtra(Intent.EXTRA_TEXT, texto);
+                i.setClipData(android.content.ClipData.newRawUri("", Archivos.IMAGEN));
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                if (paquete != null && !paquete.isEmpty()) {
+                    try { startActivity(new Intent(i).setPackage(paquete)); return; } catch (Exception ignored) {}   // sin WhatsApp: el menú de siempre
+                }
+                try { startActivity(Intent.createChooser(i, "Compartir precio")); } catch (Exception ignored) {}
+            });
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
