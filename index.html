@@ -1066,7 +1066,46 @@ document.getElementById('veloAct').addEventListener('click', e => {
   if (b && b.dataset.act === 'si' && window.AppPD){ b.textContent = 'Actualizando…'; AppPD.actualizar(); }
 });
 // (No se le pregunta a la app al arrancar: esa pregunta trababa la página y quedaba en negro. La app avisa sola llamando a avisoActualizacion.)
+// Y además la página misma se fija si hay una app más nueva (él: "no sale solo el cartel, tengo que cerrar la app y volver a
+// abrirla"): la app sólo revisaba al abrirse de cero. Acá se revisa al cargar, al volver a la app y cada 15 minutos, sin
+// preguntarle nada a la app: la versión instalada sale del user agent (PreciosDiaApp/1.N ↔ versionCode N+1) y la
+// publicada de apk/version.txt. Con "Después" no vuelve a aparecer por 30 minutos.
+function versionAppInstalada(){ const m = navigator.userAgent.match(/PreciosDiaApp\/1\.(\d+)/); return m ? +m[1] + 1 : 0; }
+let actRevisado = 0, actDespues = 0;
+async function revisarAppNueva(){
+  const mia = versionAppInstalada();
+  if (!mia || !window.AppPD || document.hidden) return;
+  if (Date.now() - actRevisado < 60000 || Date.now() - actDespues < 30 * 60000) return;
+  if (document.getElementById('veloAct').classList.contains('on')) return;
+  actRevisado = Date.now();
+  try {
+    const v = +(await (await fetch('https://jmm1992.github.io/precios-dia/apk/version.txt?t=' + Date.now(), {cache:'no-store'})).text()).trim();
+    if (v > mia){ avisoActualizacion.visto = false; avisoActualizacion(); }
+  } catch(e){ /* sin internet: se vuelve a probar en la próxima */ }
+}
+document.getElementById('veloAct').addEventListener('click', e => { if (e.target.id === 'veloAct' || e.target.closest('[data-act="despues"]')) actDespues = Date.now(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(revisarAppNueva, 800); });
+setTimeout(revisarAppNueva, 3000);
+setInterval(revisarAppNueva, 15 * 60000);
+// La app (1.18+) pregunta esto antes de poner una página nueva: si se está escribiendo, hay algo abierto o se tocó la
+// pantalla hace menos de 8 s, espera (recargar en el medio cerraba el teclado y borraba lo escrito).
+let ultimoToque = 0;
+['pointerdown', 'keydown', 'input', 'scroll'].forEach(t => document.addEventListener(t, () => { ultimoToque = Date.now(); }, {passive:true, capture:true}));
+window.ocupado = () => {
+  const a = document.activeElement;
+  return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || document.getElementById('velo').classList.contains('on')
+    || document.getElementById('veloAct').classList.contains('on') || Date.now() - ultimoToque < 8000;
+};
+// Y si igual se recarga (app vieja), lo que se estaba escribiendo vuelve a su campo
+window.addEventListener('pagehide', () => {
+  const a = document.activeElement;
+  try { sessionStorage.setItem('pd:escrito', a && a.tagName === 'INPUT' && a.id && a.type !== 'password' && a.value ? JSON.stringify({id:a.id, v:a.value}) : ''); } catch(e){}
+});
 dibujar();
+try {
+  const e = JSON.parse(sessionStorage.getItem('pd:escrito') || 'null'); sessionStorage.removeItem('pd:escrito');
+  if (e){ const i = document.getElementById(e.id); if (i){ i.value = e.v; i.focus(); i.setSelectionRange(e.v.length, e.v.length); } }
+} catch(e){}
 </script>
 </body>
 </html>

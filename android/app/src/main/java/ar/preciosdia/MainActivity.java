@@ -141,8 +141,27 @@ public class MainActivity extends Activity {
     /** Baja la página publicada; si cambió, la muestra (también al volver a la app, que quedó abierta). */
     private void buscarCambios() {
         new Thread(() -> {
-            if (Pagina.bajar(this)) runOnUiThread(() -> { if (web != null) cargar(); });
+            if (Pagina.bajar(this)) runOnUiThread(this::recargarCuandoPueda);
         }, "pagina-nueva").start();
+    }
+
+    /**
+     * La página nueva se pone recién cuando no se está usando (1.18; él: "cuando escribo la primera vez en el buscador
+     * se me cierra y borra"): recargar en el medio cerraba el teclado y borraba lo escrito. Se le pregunta a la página
+     * (window.ocupado: un campo con el foco, algo abierto o un toque en los últimos segundos) y si está ocupada se
+     * vuelve a probar en 3 s. Si la página no contesta (vacía, vieja), se recarga.
+     */
+    private boolean recargaPendiente = false;
+    private void recargarCuandoPueda() {
+        if (web == null || recargaPendiente) return;
+        recargaPendiente = true;
+        final WebView esta = web;
+        web.evaluateJavascript("(window.ocupado && ocupado()) ? 1 : 0", v -> {
+            recargaPendiente = false;
+            if (web != esta) return;
+            if ("1".equals(v)) reloj.postDelayed(this::recargarCuandoPueda, 3000);
+            else cargar();
+        });
     }
 
     /**
