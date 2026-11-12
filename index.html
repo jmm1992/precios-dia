@@ -295,7 +295,25 @@ const fecha = iso => new Date(iso).toLocaleDateString('es-AR', {day:'numeric', m
 const VERSION_PAGINA = '01/11 09:45';
 const versiones = () => { const m = /PreciosDiaApp\/([\d.]+)/.exec(navigator.userAgent); return `Página ${VERSION_PAGINA}` + (m ? ` · app ${m[1]}` : ' · navegador'); };
 const nombreTienda = (t = st.tienda) => `Día ${t.nombre || t.localidad}`.trim() + (t.direccion ? ' · ' + t.direccion : '');
-const porQue = u => u === 'kg' ? 'el kilo' : 'el litro';
+const porQue = u => u === 'kg' ? 'el kilo' : u === 'metro' ? 'el metro' : 'el litro';
+const nomUnidad = u => u === 'kg' ? 'kilo' : u === 'metro' ? 'metro' : 'litro';
+// El precio por metro lleva centavos (el papel sale $8,28 el metro); por kilo o litro, redondeado
+const plataU = (v, u) => u === 'metro' ? '$ ' + Number(v).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) : plataR(v);
+// Papel higiénico, rollos de cocina, film…: Día no da un precio por metro confiable (por rollo o por m², según el
+// producto), así que se saca del nombre: metros por rollo × rollos ("80mts 4 Ud." → 320 m). Sólo si Día no dio
+// precio por kilo o litro. La doble hoja se compara en el mismo grupo pero se aclara (él, 11/11).
+function completarPorMetro(p){
+  if (!p || p.porUnidad || p.unidad === 'metro') return p;
+  const m = String(p.nombre || '').match(/(\d+(?:[.,]\d+)?)\s*m(?:ts?|etros?)?(?=[\s.,]|$)/i);
+  const metros = m ? parseFloat(m[1].replace(',', '.')) : 0;
+  if (!(metros >= 5)) return p;
+  const total = metros * (unidadesDelNombre(p.nombre) || 1);
+  p.unidad = 'metro'; p.metros = total;
+  p.porUnidad = Math.round(p.precio / total * 100) / 100;
+  p.porUnidad2 = p.llevando2 ? Math.round(p.llevando2 / total * 100) / 100 : null;
+  p.dobleHoja = /doble\s*hoja/i.test(p.nombre);
+  return p;
+}
 // Cuántas unidades trae el paquete, leído del nombre: "3 X 120 Gr." → 3, "80mts 4 Ud." → 4. Sin eso, 0.
 function unidadesDelNombre(nombre){
   const t = String(nombre || '');
@@ -332,7 +350,8 @@ let enPantalla = new Map();   // id -> producto, para abrir el detalle
 const esMuyBajo = p => !!p.muyBajo;
 function marcas(p){
   const f = [];
-  if (p.primeroGrupo) f.push(`<span class="flag oro">🥇 El más barato por ${p.unidad === 'kg' ? 'kilo' : 'litro'}</span>`);
+  if (p.primeroGrupo) f.push(`<span class="flag oro">🥇 El más barato por ${nomUnidad(p.unidad)}</span>`);
+  if (p.dobleHoja) f.push(`<span class="flag vio">Doble hoja · mejor calidad</span>`);
   if (esMuyBajo(p)) f.push(`<span class="flag vio">🚨 Precio muy bajo</span>`);
   if (p.descuento >= REBAJA_GRANDE) f.push(`<span class="flag rojo">⚡ Rebaja enorme</span>`);
   return f.join('');
@@ -348,7 +367,7 @@ function tarjeta(p){
     <div class="info">
       <div class="nom">${esc(p.nombre)}</div>
       <div class="precio">${plata(p.precio)}${p.lista > p.precio ? `<s>${plata(p.lista)}</s>` : ''}</div>
-      ${p.porUnidad ? `<div class="unit">${plataR(p.porUnidad)} ${porQue(p.unidad)}</div>` : ''}
+      ${p.porUnidad ? `<div class="unit">${plataU(p.porUnidad, p.unidad)} ${porQue(p.unidad)}${p.unidad === 'metro' ? ` <small>(${p.metros.toLocaleString('es-AR')} m)</small>` : ''}</div>` : ''}
       ${p.llevando2 ? `<div class="promo2">Llevando ${p.promoCant || 2}: ${plata(p.llevando2)} c/u</div>` : ''}
       ${p.disponible ? '' : '<div class="flag rojo">Sin stock en tu tienda</div>'}
       ${marcas(p)}
@@ -376,7 +395,8 @@ function cacheGuardar(k, d){
   const ks = Object.keys(c).sort((a, b) => c[b].t - c[a].t); for (const x of ks.slice(25)) delete c[x];
   try { localStorage.setItem(LSC, JSON.stringify(c)); } catch(e){ try { localStorage.removeItem(LSC); } catch(_){} }
 }
-async function cargar(render, cuerpo, forzar){
+async function cargar(render0, cuerpo, forzar){
+  const render = d => { (d && d.productos || []).forEach(completarPorMetro); render0(d); };
   const yo = ++pedido, k = JSON.stringify(cuerpo);
   const viejo = !forzar && cacheLeer(k);
   const enMemoria = memo.get(k);
@@ -419,10 +439,10 @@ async function vOfertas(forzar){
   }, {do:'listar', modo:'ofertas', cat:st.ofCat, orden:'descuento', tienda:tiendaParam()}, forzar);
 }
 
-const ORDENES = [['descuento','🏷️ Mejores ofertas'], ['unidad','⚖️ Más barato por kilo/litro'], ['precio','💲 Más barato'], ['caro','💎 Más caro'], ['nombre','🔤 Nombre (A-Z)']];
+const ORDENES = [['descuento','🏷️ Mejores ofertas'], ['unidad','⚖️ Más barato por kilo/litro/metro'], ['precio','💲 Más barato'], ['caro','💎 Más caro'], ['nombre','🔤 Nombre (A-Z)']];
 const EXPLICA = {
   descuento: 'Primero los precios muy bajos y después el mayor descuento sobre el precio de lista.',
-  unidad: 'Por precio por kilo o por litro, para comparar marcas y tamaños. Cada producto se compara con los de su mismo tipo.',
+  unidad: 'Por precio por kilo, litro o metro (papel higiénico, rollos de cocina), para comparar marcas y tamaños. Cada producto se compara con los de su mismo tipo.',
   precio: 'Del más barato al más caro.',
   caro: 'Del más caro al más barato.',
   nombre: 'Por nombre, de la A a la Z.',
@@ -438,9 +458,11 @@ function renderOrdenado(j){
   let h = `<div class="fila" style="margin-bottom:8px"><span class="bajada" style="margin:0">${EXPLICA[st.orden]}</span>${cabeceraHora(j)}</div>`;
   if (st.orden !== 'unidad') return h + grilla(j.productos);
   const grupos = new Map();
-  for (const p of j.productos){ const k = p.porUnidad ? (p.subsub || p.subrubro || 'Otros') : 'Sin precio por kilo o litro'; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); }
+  for (const p of j.productos){ const k = p.porUnidad ? (p.subsub || p.subrubro || 'Otros') : 'Sin precio por kilo, litro o metro'; (grupos.get(k) || grupos.set(k, []).get(k)).push(p); }
   const sinTodos = [];   // los sin stock de todos los grupos, juntos al final
+  const pu = p => p.porUnidad2 ?? p.porUnidad ?? 1e12;
   for (const [k, ps] of grupos){
+    ps.sort((a, b) => pu(a) - pu(b));
     const conStock = ps.filter(p => p.disponible && p.porUnidad);
     if (conStock.length >= 2) conStock[0].primeroGrupo = true;
     const con = ps.filter(p => p.disponible);
@@ -655,7 +677,7 @@ function abrirDetalle(p){
   if (p.lista > p.precio) r.push(['Precio de lista', `${plata(p.lista)} · ahorrás ${plata(p.lista - p.precio)} (−${pct(p.descuento)})`]);
   const n = p.promoCant || 2;
   if (p.llevando2) r.push([`Promo ${esc(p.promoNombre || '')}`, `llevando ${n}: ${plata(p.llevando2)} c/u · ${plata(p.llevando2 * n)} en total (ahorrás ${plata((p.precio - p.llevando2) * n)})`]);
-  if (p.porUnidad) r.push([`Precio por ${p.unidad === 'kg' ? 'kilo' : 'litro'}`, plataR(p.porUnidad) + (p.porUnidad2 ? ` (${plataR(p.porUnidad2)} con la promo)` : '')]);
+  if (p.porUnidad) r.push([`Precio por ${nomUnidad(p.unidad)}`, plataU(p.porUnidad, p.unidad) + (p.porUnidad2 ? ` (${plataU(p.porUnidad2, p.unidad)} con la promo)` : '') + (p.unidad === 'metro' ? ` · ${p.metros.toLocaleString('es-AR')} m en total` + (p.dobleHoja ? ', doble hoja (mejor calidad)' : '') : '')]);
   const nu = unidadesDelNombre(p.nombre);
   if (nu) r.push(['Precio por unidad', `${plataR(p.precio / nu)} c/u (${nu} unidades)` + (p.llevando2 ? ` · ${plataR(p.llevando2 / nu)} con la promo` : '')]);
   r.push(['Stock en tu tienda', p.disponible ? '✓ Hay para retirar' : '✗ No hay']);
@@ -690,7 +712,7 @@ function abrirCompartir(){
   if (!panel.hidden){ panel.hidden = true; return; }
   const o = compOpc();
   panel.innerHTML = `<h3 class="subt">Compartir como imagen</h3>
-    <div class="compOpc">${COMP_OPC.filter(([k]) => compTiene(p, k)).map(([k, t]) => `<label><input type="checkbox" data-compopc="${k}" ${o[k] ? 'checked' : ''}> ${t}</label>`).join('')}</div>
+    <div class="compOpc">${COMP_OPC.filter(([k]) => compTiene(p, k)).map(([k, t]) => [k, k === 'kilo' ? 'Precio por ' + nomUnidad(p.unidad) : t]).map(([k, t]) => `<label><input type="checkbox" data-compopc="${k}" ${o[k] ? 'checked' : ''}> ${t}</label>`).join('')}</div>
     <div class="compFormato"><button data-compformato="alta" class="${compFormato === 'alta' ? 'on' : ''}">Para estado / historia</button><button data-compformato="chat" class="${compFormato === 'chat' ? 'on' : ''}">Para chat</button></div>
     <div class="compVista"><span class="nota">Armando la imagen…</span></div>
     <div class="botones"><button class="wa" data-compenviar="wa">WhatsApp</button><button class="pri" data-compenviar="otra">Compartir…</button></div>`;
@@ -729,7 +751,7 @@ async function compArmarChat(p){
   ctx.font = `700 ${12.5 * K}px ${F}`; const promoR = promo ? compRenglones(ctx, promo, AN - 16 * K, 2) : [];
   const nu = unidadesDelNombre(p.nombre);
   const unid = usa('unid') ? `${plataR((usa('promo') ? p.llevando2 : p.precio) / nu)} cada unidad (${nu})${usa('promo') ? ' con la promo' : ''}` : '';
-  const kilo = usa('kilo') ? `${plataR(p.porUnidad2 && usa('promo') ? p.porUnidad2 : p.porUnidad)} ${porQue(p.unidad)}${p.porUnidad2 && usa('promo') ? ' con la promo' : ''}` : '';
+  const kilo = usa('kilo') ? `${plataU(p.porUnidad2 && usa('promo') ? p.porUnidad2 : p.porUnidad, p.unidad)} ${porQue(p.unidad)}${p.dobleHoja ? ' · doble hoja' : ''}${p.porUnidad2 && usa('promo') ? ' con la promo' : ''}` : '';
   let th = nom.length * 19 * K + 8 * K + 30 * K + (listaAbajo ? 18 * K : 0);
   if (promoR.length) th += 10 * K + promoR.length * 17 * K + 12 * K;
   if (unid) th += 20 * K;
@@ -846,7 +868,7 @@ async function compArmar(p){
     y += ph;
   }
   if (usa('unid')){ const nu = unidadesDelNombre(p.nombre), pr = usa('promo') ? p.llevando2 : p.precio; y += 20 * K; ctx.fillStyle = '#171b26'; ctx.font = `600 ${14 * K}px ${F}`; ctx.fillText(`${plataR(pr / nu)} cada unidad (${nu} en el paquete)${usa('promo') ? ' con la promo' : ''}`, 16 * K, y); y += 4 * K; }
-  if (usa('kilo')){ y += 20 * K; ctx.fillStyle = '#6b7385'; ctx.font = `${13 * K}px ${F}`; ctx.fillText(`${plataR(p.porUnidad2 && usa('promo') ? p.porUnidad2 : p.porUnidad)} ${porQue(p.unidad)}${p.porUnidad2 && usa('promo') ? ' con la promo' : ''}`, 16 * K, y); y += 4 * K; }
+  if (usa('kilo')){ y += 20 * K; ctx.fillStyle = '#6b7385'; ctx.font = `${13 * K}px ${F}`; ctx.fillText(`${plataU(p.porUnidad2 && usa('promo') ? p.porUnidad2 : p.porUnidad, p.unidad)} ${porQue(p.unidad)}${p.dobleHoja ? ' · doble hoja' : ''}${p.porUnidad2 && usa('promo') ? ' con la promo' : ''}`, 16 * K, y); y += 4 * K; }
   y += 16 * K;
   // pie: la tienda
   if (usa('tienda')){
