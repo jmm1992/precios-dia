@@ -140,11 +140,14 @@ async function simular(ids: string[], t: { seller: string; geo: number[] }, cant
     });
     // Con una promo tipo "2do al 50%" Día parte el producto en VARIOS renglones (uno con descuento y otro sin):
     // hay que sumarlos. Quedarse con uno solo perdía la promo.
+    // Los que se venden "x Kg." Día los cobra de a una porción (unitMultiplier 0,5 = medio kilo): el total es el de
+    // esa porción, mientras price y listPrice son por kilo. Se lleva el total al kilo, como lo muestra la web de Día
+    // (él, 11/11: "Queso Cremoso La Paulina x Kg." salía a $5.950 y vale $11.900 el kilo).
     for (const it of j.items || []) {
-      const id = String(it.id), q = it.quantity || 0;
+      const id = String(it.id), q = it.quantity || 0, mult = Number(it.unitMultiplier) > 0 ? Number(it.unitMultiplier) : 1;
       const total = (it.priceDefinition?.total ?? it.sellingPrice * q) / 100;
       const o = out[id] || (out[id] = { total: 0, cant: 0, lista: it.listPrice / 100, disp: false });
-      o.total += total; o.cant += q; o.disp = o.disp || it.availability === "available";
+      o.total += total; o.cant += q * mult; o.disp = o.disp || it.availability === "available";
     }
   }
   for (const o of Object.values(out)) o.unit = o.cant ? o.total / o.cant : null;
